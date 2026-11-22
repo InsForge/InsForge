@@ -3,7 +3,12 @@ import { useQuery } from '@tanstack/react-query';
 import type { PaymentEnvironment, PaymentProvider } from '@insforge/shared-schemas';
 import { stripeService } from '#features/payments/services/stripe.service';
 import { razorpayService } from '#features/payments/services/razorpay.service';
-import { razorpayQueryKeys, stripeQueryKeys } from '#features/payments/queryKeys';
+import { paystackService } from '#features/payments/services/paystack.service';
+import {
+  paystackQueryKeys,
+  razorpayQueryKeys,
+  stripeQueryKeys,
+} from '#features/payments/queryKeys';
 
 export function usePaymentConnectionStatus(
   provider: PaymentProvider,
@@ -11,6 +16,7 @@ export function usePaymentConnectionStatus(
 ) {
   const isStripeProvider = provider === 'stripe';
   const isRazorpayProvider = provider === 'razorpay';
+  const isPaystackProvider = provider === 'paystack';
 
   const {
     data: stripeStatusData,
@@ -34,6 +40,17 @@ export function usePaymentConnectionStatus(
     staleTime: 30 * 1000,
   });
 
+  const {
+    data: paystackStatusData,
+    isLoading: isLoadingPaystackStatus,
+    error: paystackStatusError,
+  } = useQuery({
+    queryKey: paystackQueryKeys.status,
+    queryFn: () => paystackService.getStatus(),
+    enabled: isPaystackProvider,
+    staleTime: 30 * 1000,
+  });
+
   const activeStripeConnection = useMemo(
     () =>
       stripeStatusData?.connections.find((connection) => connection.environment === environment) ??
@@ -49,13 +66,32 @@ export function usePaymentConnectionStatus(
     [environment, razorpayStatusData]
   );
 
-  const activeConnection =
-    provider === 'stripe' ? activeStripeConnection : activeRazorpayConnection;
+  const activePaystackConnection = useMemo(
+    () =>
+      paystackStatusData?.paystackConnections.find(
+        (connection) => connection.environment === environment
+      ) ?? null,
+    [environment, paystackStatusData]
+  );
+
+  const activeConnection = isStripeProvider
+    ? activeStripeConnection
+    : isRazorpayProvider
+      ? activeRazorpayConnection
+      : activePaystackConnection;
 
   return {
     activeConnection,
     hasActiveKey: !!activeConnection?.maskedKey,
-    isLoading: isStripeProvider ? isLoadingStripeStatus : isLoadingRazorpayStatus,
-    error: isStripeProvider ? stripeStatusError : razorpayStatusError,
+    isLoading: isStripeProvider
+      ? isLoadingStripeStatus
+      : isRazorpayProvider
+        ? isLoadingRazorpayStatus
+        : isLoadingPaystackStatus,
+    error: isStripeProvider
+      ? stripeStatusError
+      : isRazorpayProvider
+        ? razorpayStatusError
+        : paystackStatusError,
   };
 }
