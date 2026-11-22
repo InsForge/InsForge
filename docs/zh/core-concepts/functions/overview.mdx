@@ -66,6 +66,12 @@ npx @insforge/cli secrets get STRIPE_SECRET_KEY
 
 使用 [Deno 标准库](https://jsr.io/@std) 和来自 `jsr.io`、`esm.sh` 或 `npm:` 说明符的任何 ESM 模块。您无需运行打包程序，也没有 `node_modules` 目录来运输。
 
+### 执行限制与超时
+
+按需 HTTP 调用在 Deno 运行时上运行，因此每个请求受平台的单请求 CPU 和内存限制约束，而不是固定的挂钟超时——当前数值请参阅 [Deno Subhosting 限制](https://docs.deno.com/subhosting/manual/pricing_and_limits/)。请保持请求处理程序简短，并将长时间运行或有状态的工作交给 [Compute](/core-concepts/compute/overview)。
+
+计划（cron）调用有明确上限：InsForge 为每次运行设定 **5 分钟的端到端 HTTP 超时**和 **5 秒的连接超时**。超过任一限制的运行都会记录在作业日志中且不会重试，因此请保持计划函数的幂等性。执行模型请参阅 [计划任务](/core-concepts/functions/schedules)。
+
 ## 概念
 
 <CardGroup cols={2}>
