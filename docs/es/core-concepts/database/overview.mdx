@@ -60,6 +60,22 @@ Búsqueda de vectores nativos para incrustaciones, con índices HNSW e IVFFlat. 
 
 Las políticas RLS de Postgres aplican acceso a nivel de fila. Las políticas leen el JWT de autenticación, por lo que la misma regla se aplica a consultas REST, llamadas SDK, suscripciones en tiempo real y solicitudes de almacenamiento.
 
+### Relaciones y visualizador de esquema
+
+Agregue una clave foránea a una columna e InsForge la trata como una relación entre tablas. Cada clave foránea registra su tabla de destino (`referenceTable`), la asignación de columnas (`referenceColumns`) y sus acciones `onDelete` / `onUpdate`.
+
+El dashboard incluye un **Visualizador de esquema (Schema Visualizer)**: un diagrama entidad-relación (ERD) que dibuja cada tabla como un nodo y una arista por cada clave foránea, para que vea de un vistazo cómo se conectan sus tablas.
+{/* TODO: confirm the exact dashboard sidebar label and navigation path to the Schema Visualizer */}
+
+Para leer las relaciones mediante programación, obtenga el esquema de una tabla: la respuesta incluye un arreglo `foreignKeys`:
+
+```bash
+curl "https://your-app.insforge.app/api/database/tables/<table>/schema" \
+  -H "Authorization: Bearer <API_KEY>"
+```
+
+Los agentes obtienen el mismo detalle a través de la herramienta MCP `get-table-schema`, que devuelve el esquema completo de una tabla, incluidas sus claves foráneas.
+
 ## Conceptos
 
 <CardGroup cols={2}>

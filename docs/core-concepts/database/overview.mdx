@@ -60,6 +60,22 @@ Native vector search for embeddings, with HNSW and IVFFlat indexes. See [pgvecto
 
 Postgres RLS policies enforce access at the row level. Policies read the auth JWT, so the same rule applies to REST queries, SDK calls, realtime subscriptions, and storage requests.
 
+### Relationships and schema visualizer
+
+Add a foreign key to a column and InsForge treats it as a relationship between tables. Each foreign key records its target table (`referenceTable`), the column mapping (`referenceColumns`), and its `onDelete` / `onUpdate` actions.
+
+The dashboard includes a **Schema Visualizer**: an entity-relationship diagram (ERD) that draws every table as a node and an edge for each foreign key, so you can see how your tables connect at a glance.
+{/* TODO: confirm the exact dashboard sidebar label and navigation path to the Schema Visualizer */}
+
+To read relationships programmatically, fetch a table's schema — the response includes a `foreignKeys` array:
+
+```bash
+curl "https://your-app.insforge.app/api/database/tables/<table>/schema" \
+  -H "Authorization: Bearer <API_KEY>"
+```
+
+Agents get the same detail through the MCP `get-table-schema` tool, which returns a table's full schema including its foreign keys.
+
 ## Concepts
 
 <CardGroup cols={2}>
