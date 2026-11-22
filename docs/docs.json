@@ -188,7 +188,8 @@
                 "pages": [
                   "alternatives",
                   "pricing",
-                  "showcase"
+                  "showcase",
+                  "support"
                 ]
               },
               {
@@ -516,7 +517,8 @@
                 "pages": [
                   "zh/alternatives",
                   "zh/pricing",
-                  "zh/showcase"
+                  "zh/showcase",
+                  "zh/support"
                 ]
               },
               {
@@ -844,7 +846,8 @@
                 "pages": [
                   "zh-Hant/alternatives",
                   "zh-Hant/pricing",
-                  "zh-Hant/showcase"
+                  "zh-Hant/showcase",
+                  "zh-Hant/support"
                 ]
               },
               {
@@ -1172,7 +1175,8 @@
                 "pages": [
                   "es/alternatives",
                   "es/pricing",
-                  "es/showcase"
+                  "es/showcase",
+                  "es/support"
                 ]
               },
               {

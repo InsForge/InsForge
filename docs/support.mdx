@@ -1,0 +1,64 @@
+---
+title: "Support & feedback"
+description: "How to get help, report a bug or request a feature with the InsForge CLI, reach the InsForge team, and why there is no in-dashboard support-ticket history."
+---
+
+Use this page when you need help, hit a bug in InsForge itself, or want to send
+the team feedback.
+
+## Get help
+
+Ask in the [InsForge Discord](https://discord.com/invite/DvBtaEc9Jz) — it is the
+fastest way to reach the team and other builders.
+
+## Report a bug or request a feature
+
+Use the CLI `feedback` command to report an InsForge-side hurdle — a bug
+(including docs-vs-behavior discrepancies), a missing capability, or DX friction.
+This is for issues with InsForge itself (the backend, an SDK, the CLI, agent
+skills, or the docs), not the app you are building. Emails, tokens, keys, and
+usernames are redacted locally before the report is submitted, and no login is
+required.
+
+```bash
+# Interactive: prompts for any required fields it still needs
+npx @insforge/cli feedback
+
+# Non-interactive (agents / CI)
+npx @insforge/cli feedback \
+  --type bug \
+  --component sdk \
+  --language js \
+  --title "verifyOtp rejects a valid code" \
+  --detail "Steps, expected vs actual, and anything else useful"
+```
+
+- `--type` — `bug`, `feature-request`, `friction`, or `other`
+- `--component` — `backend`, `sdk`, `cli`, `skills`, `docs`, or `other`
+- `--language` — required when `--component sdk` (for example `js`, `python`, `swift`, `kotlin`, `rest-api`)
+- `--title` and `--detail` — the summary and description (use `--file <path>` to load the detail from a file)
+- `--severity` — `blocker`, `major`, or `minor` (defaults to `minor`)
+
+`--type`, `--component`, `--title`, and `--detail` are required; running the
+command without them prompts interactively. Pass `--json` for a structured
+result.
+
+## Contact the team
+
+Signed-in users can send a support request to the InsForge team from the
+dashboard. {/* TODO: confirm dashboard location */} Include what you did, what
+you expected, and screenshots where they help.
+
+Some account or data issues cannot be resolved on your own. For example,
+[deleting a storage bucket is permanent](/core-concepts/storage/overview#buckets)
+— it cascade-deletes every object and has no restore, even through support.
+When you hit a case like that, reach out on [Discord](https://discord.com/invite/DvBtaEc9Jz).
+
+## Tracking your requests
+
+<Note>
+  There is no in-dashboard or API view of the feedback and support requests you
+  have already submitted — no ticket-history list exists. Keep your own copy of
+  what you send, and follow up in the same [Discord](https://discord.com/invite/DvBtaEc9Jz)
+  thread.
+</Note>
