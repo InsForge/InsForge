@@ -457,6 +457,27 @@ describe('EmailService', () => {
       ).resolves.toBeUndefined();
     });
 
+    it('normalizes recipient address when recording sent timestamp', async () => {
+      // First send uses mixed case and surrounding whitespace
+      await expect(
+        emailService.sendWithTemplate(
+          '  MixedUser@Example.COM  ',
+          'Bob',
+          'email-verification-code',
+          {
+            token: '111222',
+          }
+        )
+      ).resolves.toBeUndefined();
+
+      // Subsequent send using lowercase trimmed address must be rate-limited
+      await expect(
+        emailService.sendWithTemplate('mixeduser@example.com', 'Bob', 'email-verification-code', {
+          token: '111222',
+        })
+      ).rejects.toThrow(/Too many emails to this address/);
+    });
+
     it('throws AppError when email provider does not support raw email sending', async () => {
       vi.spyOn(SmtpConfigService.getInstance(), 'getRawSmtpConfig').mockResolvedValue(null);
       const originalSendRaw = CloudEmailProvider.prototype.sendRaw;
