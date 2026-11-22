@@ -44,6 +44,16 @@ graph TB
 
 Defina una tabla y obtendrá inmediatamente puntos finales REST más un cliente SDK escrito para ella. Sin paso de generación de código. El JWT de autenticación limita cada consulta a través de RLS.
 
+### Visualizador de esquema (modelo relacional)
+
+Vea todo su modelo de datos de un vistazo. El **Visualizador** (Visualizer) del panel representa un diagrama entidad-relación (ERD) de su proyecto: cada tabla con sus columnas, sus buckets de almacenamiento, el nodo de usuarios de auth y las relaciones de clave foránea dibujadas como líneas entre las tablas relacionadas. {/* TODO: confirm dashboard location / sidebar label for the Visualizer view */}
+
+¿Prefiere la terminal o un agente? El mismo esquema —incluidas las claves foráneas de cada tabla— está disponible sin el diagrama:
+
+- CLI: `npx @insforge/cli metadata --json` devuelve los metadatos completos del backend (tablas, buckets, funciones y más).
+- REST: `GET /api/database/tables/{table}/schema` devuelve la estructura de una sola tabla, incluidas sus `foreignKeys`.
+- MCP: la herramienta `get-table-schema` devuelve el esquema detallado de una tabla (columnas, restricciones, índices y claves foráneas).
+
 ### Migraciones
 
 Rastrear y aplicar cambios SQL en orden. [Migrations](/core-concepts/database/migrations) se envían como archivos `.sql` simples en su repositorio, aplicados con `npx @insforge/cli db migrations up --all` o mediante la herramienta MCP.

@@ -44,6 +44,16 @@ graph TB
 
 定义表，您立即获得 REST 端点加上类型化的 SDK 客户端。没有代码生成步骤。身份验证 JWT 通过 RLS 范围化每个查询。
 
+### 架构可视化（关系模型）
+
+一眼看清整个数据模型。仪表板的 **Visualizer（可视化）** 会渲染项目的实体关系图（ERD）：每个表及其列、您的存储桶、auth 用户节点，以及以连线形式绘制在相关表之间的外键关系。{/* TODO: confirm dashboard location / sidebar label for the Visualizer view */}
+
+更喜欢使用终端或 agent？相同的架构（包括每个表的外键）也可以在不使用图表的情况下获取：
+
+- CLI：`npx @insforge/cli metadata --json` 返回完整的后端元数据（表、存储桶、函数等）。
+- REST：`GET /api/database/tables/{table}/schema` 返回单个表的结构，包括其 `foreignKeys`。
+- MCP：`get-table-schema` 工具返回表的详细架构（列、约束、索引和外键）。
+
 ### 迁移
 
 跟踪和应用有序的 SQL 变更。[Migrations](/core-concepts/database/migrations) 在您的存储库中作为普通 `.sql` 文件提供，使用 `npx @insforge/cli db migrations up --all` 或通过 MCP 工具应用。
