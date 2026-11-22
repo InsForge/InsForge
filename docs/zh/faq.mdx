@@ -156,7 +156,18 @@ description: "InsForge 常见问题：数据库调用、Edge Function 与 Custom
 
     想专门加一个管理员，邀请时选 **Administrator** 即可，之后也能在 Members 列表里改角色。只有 Administrator 能邀请和管理成员。
 
+    更喜欢用 CLI？`npx @insforge/cli orgs members invite <email> --role developer`（加管理员用 `--role administrator`）发送同样的邀请，`npx @insforge/cli orgs members list` 查看组织成员和待处理的邀请。
+
     把整个组织「移交给新 Owner」是另一个独立操作，跟邀请成员不是一回事。要移交的话，打开 **Organization Settings**，用里面的 **Transfer Ownership**（只有当前 Owner 能发起，且对方必须是已验证的 InsForge 用户并接受邮件里的请求）。
+  </Accordion>
+
+  <Accordion title="InsForge 会根据我的数据库和 Edge Function 自动生成 API 文档（Swagger/OpenAPI）吗？">
+    InsForge 会为你创建的每一张表自动生成 **REST API 和类型化 SDK**：定义一张表，你就立刻拥有像 `GET /api/database/records/{table}` 这样的端点，以及 SDK 查询构造器，无需部署任何东西（见 [数据库](/core-concepts/database/overview) 和 [REST API](/sdks/rest/database)）。它**不会**根据你自己的具体表或 Edge Function 生成一份 Swagger/OpenAPI 文档。
+
+    - **表：** 每张表暴露的 REST 结构都是一致、可预测的，所以一份参考文档就能覆盖——它以表名（`{table}`）、列筛选和 PostgREST 运算符作为参数，没有专属于你 schema 的单独规范。
+    - **Edge Function：** 这些是你自己写在自己路由上的代码，没有可供内省（introspect）生成规范的对象。把每个 function 的 URL 手动分享给需要调用的人即可。
+
+    想把后端的完整上下文（schema、表、function）交给队友，正确做法是把他邀请进组织，而不是想办法导出文档——见上面「怎么把项目分享给另一个管理员，或者邀请队友？」，他就能在 dashboard 里浏览全部内容。永远不要把你的管理员 **API Key**（`ik_...`）分享出去；邀请他，让他有自己的鉴权访问，而他构建的客户端应用用公开的 **Anon Key** 鉴权（受 RLS 限制）。
   </Accordion>
 
   <Accordion title="为什么我的项目被暂停了？怎么避免被暂停？">
