@@ -64,6 +64,32 @@ Send a one-time link or six-digit code to the user's email. Passwordless sign-in
 
 First-class support for Google, GitHub, Apple, Microsoft, GitLab, Discord, and more. Add custom OAuth 2.0 / OIDC providers (Keycloak, Okta, Auth0, your own IdP) by URL without writing provider-specific code.
 
+#### Configure a provider
+
+Each social provider needs its own OAuth app, created in that provider's developer console, whose **Client ID** and **Client Secret** you then paste into InsForge. Using Google as the example:
+
+1. In the dashboard, open **Authentication → Auth Methods** and click **Google OAuth**.
+2. Follow the **Create a Google OAuth App** link to the [Google Cloud Console](https://console.cloud.google.com/apis/credentials) and create an OAuth 2.0 client. Set its authorized redirect URI to the callback URL the dialog shows — it looks like `https://<your-backend-url>/api/auth/oauth/google/callback`.
+3. Copy the app's **Client ID** and **Client Secret** from Google into the matching fields, then click **Add Provider**.
+
+The flow is identical for GitHub, Microsoft, Discord, LinkedIn, Facebook, X, and Apple — only the provider's own developer console changes.
+
+<Note>
+  On InsForge Cloud projects you can turn on the **Shared Keys** toggle instead of bringing your own credentials. Shared keys are InsForge-managed OAuth apps that let you start quickly in development; the consent screen shows InsForge's name and logo, so never use them in production.
+</Note>
+
+Prefer to script it? The dialog calls an admin-only REST API, so you can configure a provider from a terminal or CI with your project [API key](/faq) (`ik_...`):
+
+```bash
+# Create the Google provider config
+curl -X POST "$INSFORGE_BASE_URL/api/auth/oauth/configs" \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"provider":"google","clientId":"<client-id>","clientSecret":"<client-secret>"}'
+```
+
+Update an existing provider with `PUT /api/auth/oauth/<provider>/config`, or remove one with `DELETE /api/auth/oauth/<provider>/config`.
+
 ### OAuth server mode
 
 Run InsForge itself as an OAuth 2.0 / OIDC identity provider for your own downstream apps. See the [OAuth Server guide](/oauth-server) for the full setup.
