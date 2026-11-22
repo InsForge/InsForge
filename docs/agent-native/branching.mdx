@@ -39,6 +39,17 @@ Use a branch for risky schema migrations, RLS rewrites, OAuth provider swaps, an
 
 Merges block on conflicts. Resolve on the branch or reset and retry. Quotas: 3 parent projects per org, 2 active branches per parent, no nesting. A successful merge does not auto-delete the branch.
 
+## Cost
+
+Branches are not a separately priced add-on — there is no per-branch fee. A branch is a full child project that runs on its own EC2 instance (sized `nano` or `micro`, restored from the parent), so while it is running its resource usage (compute runtime, database, storage, bandwidth, and so on) is metered and counts toward your plan's included amounts and overages, just like any project.
+
+Two things keep this in check:
+
+- **Quotas** cap how many you can have: by default 3 branched parents per organization and 2 active branches per parent, with no nesting.
+- **Branches are ephemeral.** Reset or delete a branch when you are done — a successful merge does not delete it automatically. Fewer long-lived branches means less metered usage.
+
+For exact plan prices and overage rates, see the [Pricing FAQ](/pricing).
+
 ## More resources
 
 - [Database migrations](/core-concepts/database/migrations) for forward-only SQL files.
