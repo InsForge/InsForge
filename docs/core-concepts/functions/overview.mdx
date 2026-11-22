@@ -66,6 +66,12 @@ Structured logs are captured per invocation, queryable by status, duration, and 
 
 Use the [Deno standard library](https://jsr.io/@std) and any ESM module from `jsr.io`, `esm.sh`, or `npm:` specifiers. You don't run a bundler, and there's no `node_modules` directory to ship.
 
+### Execution limits and timeouts
+
+On-demand HTTP invocations run on the Deno runtime, so each request is bounded by the platform's per-request CPU and memory limits rather than a fixed wall-clock timeout — see the [Deno Subhosting limits](https://docs.deno.com/subhosting/manual/pricing_and_limits/) for the current values. Keep request handlers short, and offload long-running or stateful work to [Compute](/core-concepts/compute/overview).
+
+Scheduled (cron) invocations have an explicit ceiling: InsForge bounds each run with a **5-minute end-to-end HTTP timeout** and a **5-second connect timeout**. A run that exceeds either is recorded in the job logs and is not retried, so keep scheduled functions idempotent. See [Schedules](/core-concepts/functions/schedules) for the execution model.
+
 ## Concepts
 
 <CardGroup cols={2}>

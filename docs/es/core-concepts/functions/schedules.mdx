@@ -34,7 +34,7 @@ select schedules.create_job(
 
 ## Límites
 
-El intervalo mínimo es 1 minuto (pg_cron). Las ejecuciones fallidas se registran pero no se reintentan, por lo que la función debe ser idempotente. Eliminar un secreto referenciado interrumpe cada trabajo que lo usa hasta que actualice o desactive el cronograma.
+El intervalo mínimo es 1 minuto (pg_cron). Cada ejecución está acotada por un tiempo de espera HTTP de extremo a extremo de 5 minutos y un tiempo de espera de conexión de 5 segundos; una ejecución que supere cualquiera de los dos se registra como fallida y no se reintenta. Las ejecuciones fallidas se registran pero no se reintentan, por lo que la función debe ser idempotente. Eliminar un secreto referenciado interrumpe cada trabajo que lo usa hasta que actualice o desactive el cronograma.
 
 ## Más recursos
 

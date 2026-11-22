@@ -34,7 +34,7 @@ select schedules.create_job(
 
 ## Limits
 
-Minimum interval is 1 minute (pg_cron). Failed runs are logged but not retried, so the function must be idempotent. Deleting a referenced secret breaks every job using it until you update or disable the schedule.
+Minimum interval is 1 minute (pg_cron). Each run is bounded by a 5-minute end-to-end HTTP timeout and a 5-second connect timeout; a run that exceeds either is logged as a failure and not retried. Failed runs are logged but not retried, so the function must be idempotent. Deleting a referenced secret breaks every job using it until you update or disable the schedule.
 
 ## Long-interval callers and keep-alive
 

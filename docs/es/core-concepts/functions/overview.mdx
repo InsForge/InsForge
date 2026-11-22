@@ -66,6 +66,12 @@ Los registros estructurados se capturan por invocación, consultables por estado
 
 Utilice la [biblioteca estándar de Deno](https://jsr.io/@std) y cualquier módulo ESM de los especificadores `jsr.io`, `esm.sh` o `npm:`. No ejecuta un agrupador y no hay directorio `node_modules` para enviar.
 
+### Límites de ejecución y tiempos de espera
+
+Las invocaciones HTTP bajo demanda se ejecutan en el entorno de ejecución de Deno, por lo que cada solicitud está acotada por los límites de CPU y memoria por solicitud de la plataforma, en lugar de un tiempo de espera de reloj fijo; consulte los [límites de Deno Subhosting](https://docs.deno.com/subhosting/manual/pricing_and_limits/) para conocer los valores actuales. Mantenga los controladores de solicitudes breves y delegue el trabajo prolongado o con estado a [Compute](/core-concepts/compute/overview).
+
+Las invocaciones programadas (cron) tienen un límite explícito: InsForge acota cada ejecución con un **tiempo de espera HTTP de extremo a extremo de 5 minutos** y un **tiempo de espera de conexión de 5 segundos**. Una ejecución que supere cualquiera de los dos se registra en los registros del trabajo y no se reintenta, así que mantenga las funciones programadas idempotentes. Consulte [Programaciones](/core-concepts/functions/schedules) para conocer el modelo de ejecución.
+
 ## Conceptos
 
 <CardGroup cols={2}>
