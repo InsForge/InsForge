@@ -57,13 +57,18 @@ export class EmailService {
   // Rate limiting — check before send, record after success
   // -------------------------------------------------------------------------
 
+  private normalizeEmail(email: string): string {
+    return email.trim().toLowerCase();
+  }
+
   private checkMinInterval(email: string, minIntervalSeconds: number): void {
     if (minIntervalSeconds <= 0) {
       return;
     }
 
     const now = Date.now();
-    const lastSent = this.lastEmailSentAt.get(email);
+    const normalizedEmail = this.normalizeEmail(email);
+    const lastSent = this.lastEmailSentAt.get(normalizedEmail);
 
     if (lastSent && now - lastSent < minIntervalSeconds * 1000) {
       const retryAfter = Math.ceil((minIntervalSeconds * 1000 - (now - lastSent)) / 1000);
@@ -76,7 +81,8 @@ export class EmailService {
   }
 
   private recordEmailSent(email: string, minIntervalSeconds: number): void {
-    this.lastEmailSentAt.set(email, Date.now());
+    const normalizedEmail = this.normalizeEmail(email);
+    this.lastEmailSentAt.set(normalizedEmail, Date.now());
 
     // Prune stale entries to prevent unbounded memory growth
     if (this.lastEmailSentAt.size > 10000) {
@@ -124,7 +130,11 @@ export class EmailService {
     }
 
     if (!provider.sendRaw) {
-      throw new Error('Current email provider does not support raw email sending');
+      throw new AppError(
+        'Current email provider does not support raw email sending',
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
     }
     await provider.sendRaw(options);
 
