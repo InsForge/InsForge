@@ -13,7 +13,11 @@ vi.mock('../../src/services/storage/storage.service.js', () => ({
 }));
 
 vi.mock('../../src/api/middlewares/s3-sigv4.js', () => ({
-  s3Sigv4Middleware: (req: express.Request, _res: express.Response, next: express.NextFunction) => {
+  s3Sigv4Middleware: async (
+    req: express.Request,
+    _res: express.Response,
+    next: express.NextFunction
+  ) => {
     (req as express.Request & { s3Auth?: { accessKeyId: string; requestId: string } }).s3Auth = {
       accessKeyId: 'test-ak',
       requestId: 'req-12345',
