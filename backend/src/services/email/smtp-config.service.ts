@@ -338,7 +338,7 @@ export class SmtpConfigService {
   }
 
   /** Validate SMTP host resolves to a public IP and uses an allowed port */
-  private async validateSmtpHost(host: string, port: number): Promise<void> {
+  async validateSmtpHost(host: string, port: number): Promise<void> {
     if (!ALLOWED_SMTP_PORTS.includes(port)) {
       throw new AppError(
         `Invalid SMTP port: ${port}. Allowed ports: ${ALLOWED_SMTP_PORTS.join(', ')}`,
@@ -347,9 +347,11 @@ export class SmtpConfigService {
       );
     }
 
+    const normalizedHost = host.trim().toLowerCase().replace(/\.+$/, '');
+
     // If the host is a raw IP address, validate it directly without DNS
-    if (net.isIP(host)) {
-      if (isPrivateIp(host)) {
+    if (net.isIP(normalizedHost)) {
+      if (isPrivateIp(normalizedHost)) {
         throw new AppError(
           'SMTP host is a private or loopback address, which is not allowed',
           400,
@@ -359,12 +361,20 @@ export class SmtpConfigService {
       return;
     }
 
+    if (normalizedHost === 'localhost' || normalizedHost.endsWith('.localhost')) {
+      throw new AppError(
+        'SMTP host is a private or loopback address, which is not allowed',
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+
     try {
-      const [ipv4, ipv6] = await Promise.all([
-        dns.resolve4(host).catch(() => []),
-        dns.resolve6(host).catch(() => []),
-      ]);
-      const privateAddr = [...ipv4, ...ipv6].find(isPrivateIp);
+      const addresses = await dns.lookup(normalizedHost, { all: true });
+      if (!addresses || addresses.length === 0) {
+        throw new AppError('SMTP host could not be resolved', 400, ERROR_CODES.INVALID_INPUT);
+      }
+      const privateAddr = addresses.find((entry) => isPrivateIp(entry.address));
       if (privateAddr) {
         throw new AppError(
           'SMTP host resolves to a private or loopback address, which is not allowed',
@@ -376,7 +386,7 @@ export class SmtpConfigService {
       if (error instanceof AppError) {
         throw error;
       }
-      // DNS resolution failure is fine — transporter.verify() will catch it
+      throw new AppError('SMTP host could not be resolved', 400, ERROR_CODES.INVALID_INPUT);
     }
   }
 
