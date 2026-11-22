@@ -64,6 +64,16 @@ Send a one-time link or six-digit code to the user's email. Passwordless sign-in
 
 First-class support for Google, GitHub, Apple, Microsoft, GitLab, Discord, and more. Add custom OAuth 2.0 / OIDC providers (Keycloak, Okta, Auth0, your own IdP) by URL without writing provider-specific code.
 
+#### Linking a provider to an existing user
+
+You don't need a separate account-linking step. When someone signs in with an OAuth provider (for example Google) and the email returned by that provider matches an existing user — whether that user was created with email and password or with a different provider — InsForge links the new identity to the existing account automatically. It records the provider in `auth.user_providers`, marks the email as verified, and signs the user in as that same account. No duplicate user is created and no error is returned.
+
+To let your current users start signing in with Google, enable the Google provider under **Authentication → Auth Methods** in the dashboard. The next time a user signs in with Google using the same email as their existing account, that Google identity is attached to their user and they keep the same user ID and data.
+
+<Note>
+  Linking is matched purely on the email address asserted by the provider, so only enable providers you trust to verify email ownership. The project-level signup toggle only blocks brand-new users: a sign-in whose email matches an existing account is still linked and signed in even when new signups are disabled. There is no built-in endpoint to attach a provider to an already-signed-in session without a fresh OAuth sign-in, or to unlink one.
+</Note>
+
 ### OAuth server mode
 
 Run InsForge itself as an OAuth 2.0 / OIDC identity provider for your own downstream apps. See the [OAuth Server guide](/oauth-server) for the full setup.
