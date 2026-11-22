@@ -75,6 +75,12 @@ Los eventos de envío (`accepted`, `delivered`, `bounced`, `complained`) se regi
 
 Los límites por proyecto y por plan evitan que los bucles extraviados destruyan la capacidad de entrega. Configurable desde el panel, aplicado en la puerta de enlace.
 
+<Note>
+  **El correo bajo demanda requiere un plan de pago.** Enviar mensajes transaccionales con `emails.send()` solo está disponible en los planes de pago: en el plan **Free**, la llamada devuelve `On-demand email service is only available for paid plans` y no se entrega nada. Los correos de autenticación (códigos de verificación, restablecimiento de contraseña, códigos de un solo uso) son la excepción: se envían en todos los planes, limitados únicamente por su uso mensual de correo.
+
+  **Cada destinatario se cuenta individualmente.** Cada dirección en `to`, `cc` y `bcc` cuenta como un envío frente a su límite de velocidad y su uso mensual: un solo mensaje a tres destinatarios son tres envíos. Los planes de pago aplican una ventana fija de límite de velocidad de una hora; la cantidad exacta por hora depende de su plan. Consulte su plan actual con `npx @insforge/cli usage` y vea [Precios](/pricing) para saber qué incluye cada plan.
+</Note>
+
 ## Conceptos
 
 <CardGroup cols={2}>
