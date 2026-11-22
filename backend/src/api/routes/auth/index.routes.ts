@@ -142,10 +142,12 @@ router.get('/email/verify-link', async (req: Request, res: Response, next: NextF
       })
     );
   } catch (error) {
+    logger.error('Verify email link error', { error });
     if (redirectTo) {
       try {
         if (await authConfigService.validateRedirectUrl(redirectTo)) {
-          const message = error instanceof Error ? error.message : 'Authentication action failed';
+          const message =
+            error instanceof AppError ? error.message : 'Authentication action failed';
           return res.redirect(
             buildRedirectUrl(redirectTo, {
               insforge_status: 'error',
@@ -214,10 +216,12 @@ router.get(
         })
       );
     } catch (error) {
+      logger.error('Reset password link error', { error });
       if (redirectTo) {
         try {
           if (await authConfigService.validateRedirectUrl(redirectTo)) {
-            const message = error instanceof Error ? error.message : 'Authentication action failed';
+            const message =
+              error instanceof AppError ? error.message : 'Authentication action failed';
             return res.redirect(
               buildRedirectUrl(redirectTo, {
                 insforge_status: 'error',
