@@ -1,0 +1,121 @@
+---
+title: "记忆"
+sidebarTitle: "概述"
+description: "使用嵌入向量存储持久的代理记忆并按语义召回它们——一个在每个 InsForge 项目中预置的、由 pgvector 支持的托管记忆存储，可通过 CLI 或 REST API 调用。"
+---
+
+当代理或应用需要跨会话记住持久事实时使用记忆——例如端点、决策及其理由、用户偏好，或某个凭据的存放位置——并在之后按语义召回相关记忆。记忆是在每个 InsForge 项目中预置的托管存储：您写入简短、自包含的记忆，InsForge 会将其嵌入、去重，并为查询返回最相关的记忆。
+
+<Note>
+  **想改为构建自己的向量存储？** 直接使用 [pgvector](/core-concepts/database/pgvector) 来设计您自己的表、嵌入和相似性查询。记忆是构建在同一技术之上的一个有主见的托管层——当您希望获得持久的代理记忆而无需自行搭建模式时，请使用它。
+</Note>
+
+<Note>
+  **前提条件。** `remember` 和 `recall` 会调用[模型网关](/core-concepts/ai/overview)来嵌入文本（`remember` 还会使用聊天模型来提取和协调记忆）。自托管实例必须先配置模型网关（设置 `OPENROUTER_API_KEY`）才能存储或召回。`list` 直接读取 Postgres，无需 AI 提供商。
+</Note>
+
+## 概念
+
+**记忆**是一条简短、自包含的持久事实，带有一行 `title` 和一段 `content` 正文。每条记忆都有一个**种类**——`fact`、`decision`、`preference` 或 `reference`——并被嵌入并存储在托管的 `memory.memories` 表中。
+
+**作用域（scope）**是一个逻辑分区（例如 `project`、某个代理 id 或某个终端用户 id）。每次写入和读取都带有作用域，因此一个项目可以持有多套独立的记忆集合。默认作用域为 `default`。
+
+记忆提供三种操作：
+
+- **Remember** — 存储一条记忆（或从任务转录中提取多条）。
+- **Recall** — 为查询找到最相关的记忆。
+- **List** — 对一个作用域中所有内容的廉价、仅标题的索引，不进行嵌入或 AI 调用。
+
+## 功能
+
+### Remember
+
+`remember` 有两种模式：
+
+- **显式** — 传入 `title` 和 `content`（以及可选的 `kind`）以存储一条记忆。
+- **转录** — 传入任务 `transcript`，由聊天模型提取值得保留的持久记忆，跳过临时细节。
+
+每次写入时，记忆都会将新候选项与相似的现有记忆进行协调，并返回 `ADD`（新信息）、`UPDATE`（更正或扩展现有记忆）或 `NOOP`（没有新内容）之一，从而避免重复堆积。
+
+```bash
+# 存储一条事实
+npx @insforge/cli memory remember "预发布 Stripe webhook 签名密钥位于 1Password 保险库 acme-infra，条目 stripe-staging。" \
+  --kind reference --scope project
+
+# 从任务转录中提取记忆
+npx @insforge/cli memory remember --file session.log --transcript --scope project
+```
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/memory/remember" \
+  -H "Authorization: Bearer <INSFORGE_API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "scope": "project",
+    "kind": "reference",
+    "title": "Stripe webhook secret",
+    "content": "预发布 Stripe webhook 签名密钥位于 1Password 保险库 acme-infra，条目 stripe-staging。"
+  }'
+```
+
+响应会报告每个候选项的处理结果：
+
+```json
+{ "results": [{ "action": "ADD", "id": "…", "title": "Stripe webhook secret" }] }
+```
+
+### Recall
+
+`recall` 运行**混合**搜索：它将向量相似性与关键词全文排名相结合，因此即使嵌入将其模糊化，精确词元——标识符、文件路径、键名——仍然能够匹配。它返回该作用域中最相关的记忆，按排名排序，并高于相似度阈值（默认 `0.45`）。
+
+```bash
+npx @insforge/cli memory recall "stripe webhook 密钥在哪里" --scope project --limit 5
+```
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/memory/recall" \
+  -H "Authorization: Bearer <INSFORGE_API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{ "scope": "project", "query": "stripe webhook 密钥在哪里", "limit": 5 }'
+```
+
+`limit` 默认为 `5`（最大 `50`）；传入介于 `0` 和 `1` 之间的可选 `threshold` 以收紧或放宽匹配。
+
+### List
+
+`list` 返回一个作用域中每条记忆的标题，不进行嵌入也不进行 AI 调用——足够廉价，可以在会话开始时加载，让代理知道自己知道什么，然后按需 `recall` 完整内容。
+
+```bash
+npx @insforge/cli memory list --scope project
+```
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/memory/index" \
+  -H "Authorization: Bearer <INSFORGE_API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{ "scope": "project" }'
+```
+
+### 种类与作用域
+
+每条记忆都标记一个**种类**——`fact`、`decision`、`preference` 或 `reference`——并存放在您用 `--scope` 选择的**作用域**中（默认 `default`）。使用作用域可以在一个项目内将每个代理或每个用户的记忆分开。
+
+### 存储
+
+记忆存放在托管的 `memory.memories` 表中——一个用 `openai/text-embedding-3-small` 嵌入的 `pgvector` `VECTOR(1536)` 列，与 `realtime` 和 `schedules` 等模式一起在每个项目中预置。由于它是一个普通的 Postgres 表，当您需要自定义报表时可以直接用 SQL 查询它。
+
+## API 摘要
+
+每个端点都是 `POST`，并使用项目 API 密钥进行身份验证（`Authorization: Bearer <INSFORGE_API_KEY>`）。
+
+| 端点 | 用途 | 关键请求体字段 |
+|---|---|---|
+| `/api/memory/remember` | 存储记忆或从转录中提取 | `scope`、`kind`、`title`、`content` **或** `transcript`、`source` |
+| `/api/memory/recall` | 为查询找到相关记忆 | `scope`、`query`、`limit`、`threshold` |
+| `/api/memory/index` | 一个作用域的廉价、仅标题列表 | `scope` |
+
+## 后续步骤
+
+- 设置 [CLI](/quickstart) 以链接您的项目并运行 `memory` 命令。
+- 当您需要自定义向量存储时，直接使用 [pgvector](/core-concepts/database/pgvector)。
+- 查看为记忆嵌入提供支持的[模型网关](/core-concepts/ai/overview)。

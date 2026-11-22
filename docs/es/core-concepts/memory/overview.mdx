@@ -1,0 +1,121 @@
+---
+title: "Memoria"
+sidebarTitle: "Descripción general"
+description: "Almacena memorias duraderas de agentes con incrustaciones vectoriales y recupéralas por significado: un almacén de memoria administrado y basado en pgvector, provisto en cada proyecto de InsForge y accesible desde la CLI o la API REST."
+---
+
+Usa Memoria cuando un agente o una aplicación necesite recordar hechos duraderos entre sesiones —endpoints, decisiones y su justificación, preferencias del usuario o dónde se encuentra una credencial— y luego recuperar los relevantes por significado. Memoria es un almacén administrado provisto en cada proyecto de InsForge: escribes memorias breves y autocontenidas, e InsForge las incrusta, las deduplica y devuelve las más relevantes para una consulta.
+
+<Note>
+  **¿Prefieres crear tu propio almacén vectorial?** Usa [pgvector](/core-concepts/database/pgvector) directamente para diseñar tus propias tablas, incrustaciones y consultas de similitud. Memoria es una capa administrada y con opiniones sobre la misma tecnología: recúrrela cuando quieras memoria duradera de agentes sin montar el esquema tú mismo.
+</Note>
+
+<Note>
+  **Requisito previo.** `remember` y `recall` llaman al [Model Gateway](/core-concepts/ai/overview) para incrustar texto (y `remember` también usa un modelo de chat para extraer y conciliar memorias). Las instancias autoalojadas deben configurar el Model Gateway (establecer `OPENROUTER_API_KEY`) antes de almacenar o recuperar. `list` lee Postgres directamente y no necesita ningún proveedor de IA.
+</Note>
+
+## Conceptos
+
+Una **memoria** es un hecho duradero breve y autocontenido con un `title` de una línea y un cuerpo `content`. Cada memoria tiene un **tipo** (`kind`) —`fact`, `decision`, `preference` o `reference`— y se incrusta y almacena en la tabla administrada `memory.memories`.
+
+Un **ámbito** (`scope`) es una partición lógica (por ejemplo `project`, un id de agente o un id de usuario final). Cada escritura y lectura tiene un ámbito, de modo que un proyecto puede contener conjuntos de memoria separados. El ámbito predeterminado es `default`.
+
+Memoria expone tres operaciones:
+
+- **Remember** — almacena una memoria (o extrae varias de una transcripción de tarea).
+- **Recall** — encuentra las memorias más relevantes para una consulta.
+- **List** — un índice barato, solo de títulos, de todo lo almacenado en un ámbito, sin incrustación ni llamada de IA.
+
+## Funciones
+
+### Remember
+
+`remember` funciona en dos modos:
+
+- **Explícito** — pasa un `title` y un `content` (y opcionalmente un `kind`) para almacenar una memoria.
+- **Transcripción** — pasa una `transcript` de tarea y un modelo de chat extrae las memorias duraderas que vale la pena conservar, omitiendo detalles transitorios.
+
+En cada escritura, Memoria concilia el nuevo candidato con memorias existentes similares y devuelve uno de `ADD` (información nueva), `UPDATE` (corrige o amplía una memoria existente) o `NOOP` (nada nuevo), de modo que los duplicados no se acumulan.
+
+```bash
+# Almacenar un solo hecho
+npx @insforge/cli memory remember "El secreto de firma del webhook de Stripe de staging está en la bóveda de 1Password acme-infra, elemento stripe-staging." \
+  --kind reference --scope project
+
+# Extraer memorias de una transcripción de tarea
+npx @insforge/cli memory remember --file session.log --transcript --scope project
+```
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/memory/remember" \
+  -H "Authorization: Bearer <INSFORGE_API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "scope": "project",
+    "kind": "reference",
+    "title": "Stripe webhook secret",
+    "content": "El secreto de firma del webhook de Stripe de staging está en la bóveda de 1Password acme-infra, elemento stripe-staging."
+  }'
+```
+
+La respuesta informa qué ocurrió con cada candidato:
+
+```json
+{ "results": [{ "action": "ADD", "id": "…", "title": "Stripe webhook secret" }] }
+```
+
+### Recall
+
+`recall` ejecuta una búsqueda **híbrida**: combina la similitud vectorial con el ranking de texto completo por palabras clave, de modo que los tokens exactos —identificadores, rutas de archivo, nombres de clave— siguen coincidiendo aunque las incrustaciones los difuminen. Devuelve las memorias más relevantes para el ámbito, ordenadas y por encima de un umbral de similitud (predeterminado `0.45`).
+
+```bash
+npx @insforge/cli memory recall "dónde está el secreto del webhook de stripe" --scope project --limit 5
+```
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/memory/recall" \
+  -H "Authorization: Bearer <INSFORGE_API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{ "scope": "project", "query": "dónde está el secreto del webhook de stripe", "limit": 5 }'
+```
+
+`limit` es `5` de forma predeterminada (máximo `50`); pasa un `threshold` opcional entre `0` y `1` para ajustar o relajar la coincidencia.
+
+### List
+
+`list` devuelve el título de cada memoria de un ámbito sin incrustación ni llamada de IA: lo bastante barato como para cargarlo al inicio de una sesión, de modo que un agente sepa qué sabe, y luego `recall` el contenido completo bajo demanda.
+
+```bash
+npx @insforge/cli memory list --scope project
+```
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/memory/index" \
+  -H "Authorization: Bearer <INSFORGE_API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{ "scope": "project" }'
+```
+
+### Tipos y ámbitos
+
+Cada memoria se etiqueta con un **tipo** —`fact`, `decision`, `preference` o `reference`— y vive en un **ámbito** que eliges con `--scope` (predeterminado `default`). Usa los ámbitos para mantener separada la memoria por agente o por usuario dentro de un mismo proyecto.
+
+### Almacenamiento
+
+Las memorias viven en una tabla administrada `memory.memories` —una columna `pgvector` `VECTOR(1536)` incrustada con `openai/text-embedding-3-small`, provista en cada proyecto junto con esquemas como `realtime` y `schedules`. Como es una tabla Postgres normal, puedes consultarla directamente con SQL cuando necesites informes personalizados.
+
+## Resumen de la API
+
+Cada endpoint es un `POST` y se autentica con una clave de API del proyecto (`Authorization: Bearer <INSFORGE_API_KEY>`).
+
+| Endpoint | Propósito | Campos clave del cuerpo |
+|---|---|---|
+| `/api/memory/remember` | Almacenar una memoria o extraer de una transcripción | `scope`, `kind`, `title`, `content` **o** `transcript`, `source` |
+| `/api/memory/recall` | Encontrar memorias relevantes para una consulta | `scope`, `query`, `limit`, `threshold` |
+| `/api/memory/index` | Listado barato, solo de títulos, para un ámbito | `scope` |
+
+## Próximos pasos
+
+- Configura la [CLI](/quickstart) para vincular tu proyecto y ejecutar comandos `memory`.
+- Usa [pgvector](/core-concepts/database/pgvector) directamente cuando necesites un almacén vectorial personalizado.
+- Revisa el [Model Gateway](/core-concepts/ai/overview) que impulsa las incrustaciones de memoria.
