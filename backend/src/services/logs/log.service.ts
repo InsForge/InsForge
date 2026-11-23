@@ -172,8 +172,8 @@ export class LogService {
    * raw message text.
    *
    * Deno captures stdout/stderr verbatim via the console API, so the
-   * auto-generated router's `console.log(JSON.stringify({ slug, method, status,
-   * duration }))` arrives as a JSON string with a trailing newline. Parse it,
+   * auto-generated router's structured invocation record arrives as a JSON
+   * string with a trailing newline. Parse it,
    * lift the level into `metadata`, and synthesize a readable access line.
    */
   private normalizeFunctionLogBody(entry: AppLogEntry): Record<string, unknown> {
@@ -210,15 +210,18 @@ export class LogService {
 
     const fmt = (v: unknown) => (v === undefined || v === null ? '' : String(v));
 
-    // Router request logs carry { slug, method, status, duration }. Synthesize an
-    // access line so the column shows `GET my-fn 200 1ms` instead of raw JSON.
+    // Router request logs carry { slug, method, status, durationMs }. Synthesize
+    // an access line so the column shows `GET my-fn 200 1ms` instead of raw JSON.
     if (
       parsed.method !== undefined ||
       parsed.status !== undefined ||
-      parsed.duration !== undefined
+      parsed.duration !== undefined ||
+      parsed.durationMs !== undefined
     ) {
       const target = typeof parsed.slug === 'string' ? parsed.slug : fmt(parsed.path);
-      const requestLine = [fmt(parsed.method), target, fmt(parsed.status), fmt(parsed.duration)]
+      const duration =
+        typeof parsed.durationMs === 'number' ? `${parsed.durationMs}ms` : fmt(parsed.duration);
+      const requestLine = [fmt(parsed.method), target, fmt(parsed.status), duration]
         .filter((part) => part !== '')
         .join(' ');
       return { ...rest, event_message: requestLine || raw, metadata };
