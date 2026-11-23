@@ -71,7 +71,6 @@ paths:
                     format: uuid
                   cronJobId:
                     type: string
-                    nullable: true
                   message:
                     type: string
 

@@ -21,9 +21,13 @@ paths:
                   status:
                     type: string
                     example: ok
+                  version:
+                    type: string
+                    description: Backend version, read from the root package.json at startup
+                    example: 2.3.5
                   service:
                     type: string
-                    example: Insforge Backend
+                    example: Insforge OSS Backend
                   timestamp:
                     type: string
                     format: date-time

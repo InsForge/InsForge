@@ -19,9 +19,9 @@ const postgrestUrl = appConfig.database.postgrestBaseUrl;
 // never written to a socket the server has already torn down (the stale
 // keep-alive reuse race behind "socket hang up" ECONNRESETs).
 //
-// keepAliveMsecs (TCP-level SO_KEEPALIVE probe delay, formerly 5000) is
-// deliberately left at agentkeepalive's 1000ms default — it is orthogonal to
-// the app-level freeSocketTimeout that governs socket reaping.
+// keepAliveMsecs (TCP-level SO_KEEPALIVE probe delay) is deliberately left at
+// agentkeepalive's 1000ms default — it is orthogonal to the app-level
+// freeSocketTimeout that governs socket reaping.
 const maxSockets = appConfig.database.postgrestMaxSockets;
 const maxFreeSockets = Math.min(appConfig.database.postgrestMaxFreeSockets, maxSockets);
 const freeSocketTimeout = appConfig.database.postgrestFreeSocketTimeoutMs;

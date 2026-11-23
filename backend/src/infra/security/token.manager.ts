@@ -38,10 +38,9 @@ export interface CloudProjectAuthorization {
 /**
  * JWKS instance for verifying cloud-issued tokens, built on first use.
  *
- * Lazy because this module is now imported by everything that signs an outbound cloud
- * request, and only verification needs the key set: at import time `new URL()` would
- * throw on an instance whose CLOUD_API_HOST is unset. Caching and refetching are
- * handled internally by jose once created.
+ * Lazy because only verification needs the key set, and at import time `new URL()`
+ * would throw on an instance whose CLOUD_API_HOST is unset. Caching and refetching
+ * are handled internally by jose once created.
  */
 let cachedJwks: ReturnType<typeof createRemoteJWKSet> | null = null;
 

@@ -783,9 +783,9 @@ router.delete(
 );
 
 // POST /api/auth/tokens/anon - DEPRECATED: use GET /api/metadata/anon-key
-// Kept for backward compatibility; now returns the opaque anon key instead of
-// minting a non-revocable anon JWT. The opaque key is accepted everywhere the
-// legacy anon JWT was (Authorization: Bearer), so existing callers keep working.
+// Kept for backward compatibility: returns the opaque anon key, which is accepted
+// everywhere the legacy anon JWT was (Authorization: Bearer), so existing callers
+// keep working.
 router.post(
   '/tokens/anon',
   verifyAdmin,
@@ -861,8 +861,8 @@ router.post(
       const authConfig = await authConfigService.getAuthConfig();
       const method = authConfig.verifyEmailMethod;
 
-      // Note: User enumeration is prevented at service layer
-      // Service returns gracefully (no error) if user not found
+      // An unknown email is swallowed in the service to prevent user enumeration;
+      // do not surface not-found here.
       if (method === 'link') {
         if (!redirectTo) {
           throw new AppError(
@@ -978,8 +978,8 @@ router.post(
       const authConfig = await authConfigService.getAuthConfig();
       const method = authConfig.resetPasswordMethod;
 
-      // Note: User enumeration is prevented at service layer
-      // Service returns gracefully (no error) if user not found
+      // An unknown email is swallowed in the service to prevent user enumeration;
+      // do not surface not-found here.
       if (method === 'link') {
         if (!redirectTo) {
           throw new AppError(

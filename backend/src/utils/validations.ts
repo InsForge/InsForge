@@ -1,10 +1,6 @@
 import { AppError } from '@/utils/errors.js';
 import { ERROR_CODES, type AuthConfigSchema } from '@insforge/shared-schemas';
 
-export function validateEmail(email: string) {
-  return /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(email);
-}
-
 /**
  * Validates password against authentication configuration requirements
  * @param password - The password to validate

@@ -42,9 +42,8 @@ export class SecretService {
   private anonKeyCache: AnonKeyCache | null = null;
   private anonKeyLoadPromise: Promise<AnonKeyCache> | null = null;
 
-  private constructor() {
-    // Encryption is now handled by the shared EncryptionManager
-  }
+  // Singleton: construct only via getInstance().
+  private constructor() {}
 
   public static getInstance(): SecretService {
     if (!SecretService.instance) {
@@ -433,58 +432,6 @@ export class SecretService {
   }
 
   /**
-   * Rotate a secret (create new value, keep old for grace period)
-   */
-  async rotateSecret(id: string, newValue: string): Promise<{ newId: string }> {
-    const client = await this.getPool().connect();
-    try {
-      await client.query('BEGIN');
-
-      const oldSecretResult = await client.query(`SELECT key FROM system.secrets WHERE id = $1`, [
-        id,
-      ]);
-
-      if (!oldSecretResult.rows.length) {
-        throw new Error('Secret not found');
-      }
-
-      const secretKey = oldSecretResult.rows[0].key;
-
-      await client.query(
-        `UPDATE system.secrets
-         SET is_active = false,
-             expires_at = NOW() + INTERVAL '24 hours'
-         WHERE id = $1`,
-        [id]
-      );
-
-      const encryptedValue = EncryptionManager.encrypt(newValue);
-      const newSecretResult = await client.query(
-        `INSERT INTO system.secrets (key, value_ciphertext)
-         VALUES ($1, $2)
-         RETURNING id`,
-        [secretKey, encryptedValue]
-      );
-
-      await client.query('COMMIT');
-
-      logger.info('Secret rotated', {
-        oldId: id,
-        newId: newSecretResult.rows[0].id,
-        key: secretKey,
-      });
-
-      return { newId: newSecretResult.rows[0].id };
-    } catch (error) {
-      await client.query('ROLLBACK');
-      logger.error('Failed to rotate secret', { error, id });
-      throw new Error('Failed to rotate secret');
-    } finally {
-      client.release();
-    }
-  }
-
-  /**
    * Clean up expired secrets
    */
   async cleanupExpiredSecrets(): Promise<number> {
@@ -598,7 +545,12 @@ export class SecretService {
 
       const oldKeyId = currentResult.rows[0].id;
 
-      // Rename old key to API_KEY_OLD_<timestamp> for grace period
+      // Rename old key to API_KEY_OLD_<timestamp> for grace period.
+      // Nothing calls cleanupExpiredSecrets() yet, so these rows outlive
+      // expires_at. Credential lookups (getSecretByKey, checkSecretByKey,
+      // verifyApiKey, the anon-key cache) filter on expires_at, but
+      // listSecrets() does not, so expired grace-period rows stay visible
+      // in GET /api/secrets.
       const gracePeriodKey = `API_KEY_OLD_${Date.now()}`;
       await client.query(
         `UPDATE system.secrets
@@ -750,7 +702,9 @@ export class SecretService {
 
       const oldKeyId = currentResult.rows[0].id;
 
-      // Rename old key to ANON_KEY_OLD_<timestamp> for grace period
+      // Rename old key to ANON_KEY_OLD_<timestamp> for grace period.
+      // As with API_KEY_OLD_*, expired rows are not pruned: credential
+      // lookups filter them out, but listSecrets() still returns them.
       const gracePeriodKey = `ANON_KEY_OLD_${Date.now()}`;
       await client.query(
         `UPDATE system.secrets

@@ -78,7 +78,7 @@ function getSystemDefault(columnType?: ColumnType, isNullable?: boolean): string
  * @param isNullable - Whether the column is nullable
  * @returns Formatted DEFAULT clause for SQL
  */
-export function formatDefaultValue(
+function formatDefaultValue(
   input: string | null | undefined,
   columnType?: ColumnType,
   isNullable?: boolean
@@ -287,9 +287,6 @@ export class DatabaseTableService {
             FOR EACH ROW EXECUTE FUNCTION system.update_updated_at();
           `
           );
-
-          // Update metadata
-          // Metadata is now updated on-demand
 
           return {
             schemaName,
@@ -701,9 +698,6 @@ export class DatabaseTableService {
             );
           }
 
-          // Update metadata after schema changes
-          // Metadata is now updated on-demand
-
           // enable postgrest to query this table
           await client.query(
             `
@@ -752,9 +746,6 @@ export class DatabaseTableService {
           await client.query(
             `DROP TABLE IF EXISTS ${quoteQualifiedName(schemaName, table)} CASCADE`
           );
-
-          // Update metadata
-          // Metadata is now updated on-demand
 
           // enable postgrest to query this table
           await client.query(
