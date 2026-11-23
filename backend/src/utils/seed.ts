@@ -8,6 +8,7 @@ import { OAuthProvidersSchema } from '@insforge/shared-schemas';
 import { AuthConfigService } from '@/services/auth/auth-config.service.js';
 import { TokenManager } from '@/infra/security/token.manager.js';
 import { ModelGatewayConfigService } from '@/services/ai/model-gateway-config.service.js';
+import { maskSecret } from '@/utils/mask.js';
 
 /**
  * Seeds default auth configuration for cloud environments
@@ -266,10 +267,13 @@ export async function seedBackend(): Promise<void> {
     await secretService.initializeJwtKeyPair();
     await TokenManager.getInstance().ensureKeysLoaded();
 
-    logger.info(`API key generated: ${apiKey}`);
-    logger.info(`Anon key generated: ${anonKey}`);
+    // Never write the full keys to the logger: the JSONL file feeds the
+    // dashboard logs UI and stdout is shipped to log pipelines. The full API
+    // key is available in the dashboard (Settings) and via ACCESS_API_KEY.
+    logger.info(`API key ready: ${maskSecret(apiKey)}`);
+    logger.info(`Anon key ready: ${maskSecret(anonKey)}`);
     logger.info(`Setup complete:
-      - Save this API key for your apps!
+      - API key: see Dashboard settings or the ACCESS_API_KEY value in .env
       - Dashboard: http://localhost:7131
       - API: http://localhost:7130/api
     `);

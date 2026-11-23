@@ -795,3 +795,27 @@ describe('docker compute config', () => {
     expect(loadConfig().docker.buildMaxContextSize).toBe('64mb');
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Section: server.corsAllowedOrigins
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('config.server.corsAllowedOrigins', () => {
+  it('is undefined (reflect any origin) when CORS_ALLOWED_ORIGINS is unset', () => {
+    unsetEnvKeys('CORS_ALLOWED_ORIGINS');
+    expect(loadConfig().server.corsAllowedOrigins).toBeUndefined();
+  });
+
+  it('is undefined for the wildcard', () => {
+    process.env.CORS_ALLOWED_ORIGINS = '*';
+    expect(loadConfig().server.corsAllowedOrigins).toBeUndefined();
+  });
+
+  it('parses a comma-separated allow-list into normalized origins', () => {
+    process.env.CORS_ALLOWED_ORIGINS = 'https://App.example.com/, http://localhost:7131';
+    expect(loadConfig().server.corsAllowedOrigins).toEqual([
+      'https://app.example.com',
+      'http://localhost:7131',
+    ]);
+  });
+});
