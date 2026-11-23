@@ -5,7 +5,7 @@ import { Lock } from 'lucide-react';
 import { Button } from '@insforge/ui';
 import { useDashboardHost, useDashboardProject } from '#lib/config/DashboardHostContext';
 import { useAuth } from '#lib/contexts/AuthContext';
-import { getFeatureFlag } from '#lib/analytics/posthog';
+import { useFeatureFlag } from '#lib/analytics/posthog';
 import { FEATURE_FLAGS, FEATURE_FLAG_VARIANTS } from '#lib/analytics/constants';
 import { useMcpUsage } from '#features/logs/hooks/useMcpUsage';
 
@@ -18,8 +18,8 @@ export default function CloudLoginPage() {
   const { hasCompletedOnboarding, isLoading: isMcpUsageLoading } = useMcpUsage();
   const hasRequestedAuthRef = useRef(false);
   const isCloudHosting = host.mode === 'cloud-hosting';
-  const isDTest =
-    getFeatureFlag(FEATURE_FLAGS.DASHBOARD_V4_EXPERIMENT) === FEATURE_FLAG_VARIANTS.D_TEST;
+  const dashboardVariant = useFeatureFlag(FEATURE_FLAGS.DASHBOARD_V4_EXPERIMENT);
+  const isDTest = dashboardVariant === FEATURE_FLAG_VARIANTS.D_TEST;
   const isBranch = project?.isBranch === true;
 
   useEffect(() => {
