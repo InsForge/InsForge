@@ -51,6 +51,7 @@ import FunctionLogsPage from '#features/logs/pages/FunctionLogsPage';
 import LogsPage from '#features/logs/pages/LogsPage';
 import MCPLogsPage from '#features/logs/pages/MCPLogsPage';
 import PaymentsLayout from '#features/payments/components/PaymentsLayout';
+import { IntegrationsLayout } from '#features/integrations/components/IntegrationsLayout';
 import CatalogPage from '#features/payments/pages/CatalogPage';
 import CustomersPage from '#features/payments/pages/CustomersPage';
 import SubscriptionsPage from '#features/payments/pages/SubscriptionsPage';
@@ -130,6 +131,7 @@ function AuthenticatedRoutes() {
           <Route path="quick-start" element={<AIQuickStartPage />} />
           <Route path="models" element={<AIModelsPage />} />
         </Route>
+        <Route path="/dashboard/integrations" element={<IntegrationsLayout />} />
         <Route path="/dashboard/payments" element={<PaymentsLayout />}>
           <Route index element={<Navigate to="catalog" replace />} />
           <Route path="catalog" element={<CatalogPage />} />
