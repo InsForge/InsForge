@@ -29,6 +29,8 @@ create table documents (
 
 Generate an embedding server-side and insert it.
 
+`OPENROUTER_API_KEY` is the key InsForge provisions for the [Model Gateway](/core-concepts/ai/overview). Copy the active key from the dashboard (Model Gateway → API Key), store it in a server-only `OPENROUTER_API_KEY` environment variable, and never expose it in browser code.
+
 ```typescript
 import OpenAI from 'openai';
 import { createClient } from '@insforge/sdk';
