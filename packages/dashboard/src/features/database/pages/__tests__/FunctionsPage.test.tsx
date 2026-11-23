@@ -151,7 +151,7 @@ describe('FunctionsPage pagination', () => {
   });
 
   it('navigates to page 2 when user clicks the page-2 button', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     renderPage();
     await user.click(screen.getByRole('button', { name: 'Go to page 2' }));
     expect(screen.getByText(/Showing 51 to 100 of 120/i)).toBeInTheDocument();
