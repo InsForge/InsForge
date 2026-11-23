@@ -7,7 +7,9 @@ import {
   ERROR_CODES,
   rememberRequestSchema,
   recallRequestSchema,
+  forgetRequestSchema,
   memoryIndexRequestSchema,
+  type ForgetResponse,
 } from '@insforge/shared-schemas';
 
 const router = Router();
@@ -48,6 +50,24 @@ router.post('/recall', async (req: AuthRequest, res: Response, next: NextFunctio
     }
     const memories = await memoryService.recall(parsed.data);
     successResponse(res, { memories });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /api/memory/forget
+router.post('/forget', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const parsed = forgetRequestSchema.safeParse(req.body);
+    if (!parsed.success) {
+      throw new AppError(
+        `Validation error: ${parsed.error.errors.map((e) => e.message).join(', ')}`,
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+    const forgotten = await memoryService.forget(parsed.data);
+    successResponse<ForgetResponse>(res, { forgotten });
   } catch (error) {
     next(error);
   }
