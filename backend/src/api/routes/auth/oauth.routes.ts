@@ -5,7 +5,7 @@ import { AuthConfigService } from '@/services/auth/auth-config.service.js';
 import { OAuthPKCEService } from '@/services/auth/oauth-pkce.service.js';
 import { SharedOAuthService } from '@/services/auth/shared-oauth.service.js';
 import { AuditService } from '@/services/logs/audit.service.js';
-import { TokenManager } from '@/infra/security/token.manager.js';
+import { RefreshSessionService } from '@/services/auth/refresh-session.service.js';
 import { AppError } from '@/utils/errors.js';
 import { successResponse } from '@/utils/response.js';
 import { AuthRequest, verifyAdmin } from '@/api/middlewares/auth.js';
@@ -575,11 +575,11 @@ router.post('/exchange', async (req: Request, res: Response, next: NextFunction)
     const { code, code_verifier } = validationResult.data;
     const result = await oAuthPKCEService.exchangeCode(code, code_verifier);
 
-    const tokenManager = TokenManager.getInstance();
+    const refreshSessions = RefreshSessionService.getInstance();
     dashboardEventService.publishDataUpdate({ resource: 'users' });
 
     if (clientType === 'web') {
-      const { refreshToken, csrfToken } = tokenManager.generateRefreshTokenWithCsrf(
+      const { refreshToken, csrfToken } = await refreshSessions.issueSessionForSubject(
         result.user.id,
         'user'
       );
@@ -591,7 +591,10 @@ router.post('/exchange', async (req: Request, res: Response, next: NextFunction)
         csrfToken,
       });
     } else {
-      const refreshToken = tokenManager.generateRefreshToken(result.user.id, 'user');
+      const { refreshToken } = await refreshSessions.issueSessionForSubject(
+        result.user.id,
+        'user'
+      );
       successResponse(res, {
         accessToken: result.accessToken,
         user: result.user,

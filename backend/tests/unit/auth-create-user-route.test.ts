@@ -12,8 +12,7 @@ const mocks = vi.hoisted(() => ({
   register: vi.fn(),
   getAuthConfig: vi.fn(),
   broadcastToRoom: vi.fn(),
-  generateRefreshToken: vi.fn(),
-  generateRefreshTokenWithCsrf: vi.fn(),
+  issueSessionForSubject: vi.fn(),
 }));
 
 vi.mock('@/api/middlewares/auth.js', () => ({
@@ -45,8 +44,16 @@ vi.mock('@/infra/security/token.manager.js', () => ({
     getInstance: () => ({
       verifyToken: vi.fn(),
       generateAccessToken: vi.fn().mockReturnValue('test-access-token'),
-      generateRefreshToken: mocks.generateRefreshToken,
-      generateRefreshTokenWithCsrf: mocks.generateRefreshTokenWithCsrf,
+    }),
+  },
+}));
+
+vi.mock('@/services/auth/refresh-session.service.js', () => ({
+  RefreshSessionService: {
+    getInstance: () => ({
+      issueSessionForSubject: mocks.issueSessionForSubject,
+      rotateRefreshSession: vi.fn(),
+      revokeRefreshSession: vi.fn(),
     }),
   },
 }));
@@ -180,7 +187,7 @@ describe('POST /api/auth/users – disableSignup gate', () => {
     });
     mocks.getAuthConfig.mockResolvedValue({ disableSignup: false });
     mocks.register.mockResolvedValue(NEW_USER);
-    mocks.generateRefreshTokenWithCsrf.mockReturnValue({ refreshToken: 'rt', csrfToken: 'csrf' });
+    mocks.issueSessionForSubject.mockResolvedValue({ refreshToken: 'rt', csrfToken: 'csrf' });
 
     const response = await callRoute(router, { body: validBody });
 
@@ -188,6 +195,7 @@ describe('POST /api/auth/users – disableSignup gate', () => {
     expect(mocks.getAuthConfig).toHaveBeenCalledOnce();
     expect(mocks.register).toHaveBeenCalledOnce();
     expect(mocks.register.mock.calls[0][4]).toMatchObject({ isAdminCreation: false });
+    expect(mocks.issueSessionForSubject).toHaveBeenCalledWith('new-uuid', 'user');
   });
 
   it('returns 401 when no credentials are provided', async () => {

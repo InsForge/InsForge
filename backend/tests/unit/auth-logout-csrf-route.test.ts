@@ -19,6 +19,7 @@ interface AppErrorLike {
 const mocks = vi.hoisted(() => ({
   verifyRefreshToken: vi.fn(),
   csrfTokenMatches: vi.fn(),
+  revokeRefreshSession: vi.fn(),
 }));
 
 vi.mock('@/api/middlewares/auth.js', () => ({
@@ -102,6 +103,16 @@ vi.mock('@/infra/security/token.manager.js', () => ({
   },
 }));
 
+vi.mock('@/services/auth/refresh-session.service.js', () => ({
+  RefreshSessionService: {
+    getInstance: () => ({
+      issueSessionForSubject: vi.fn(),
+      rotateRefreshSession: vi.fn(),
+      revokeRefreshSession: mocks.revokeRefreshSession,
+    }),
+  },
+}));
+
 vi.mock('@/utils/logger.js', () => ({
   default: { info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() },
 }));
@@ -135,6 +146,7 @@ function callLogout(
     headers?: Request['headers'];
     cookies?: Record<string, string>;
     query?: Record<string, string>;
+    body?: Record<string, unknown>;
   } = {}
 ): Promise<{ statusCode: number; body: unknown; clearCookie: ReturnType<typeof vi.fn> }> {
   return new Promise((resolve, reject) => {
@@ -146,7 +158,7 @@ function callLogout(
       headers: overrides.headers ?? {},
       query: overrides.query ?? {},
       cookies: overrides.cookies ?? {},
-      body: {},
+      body: overrides.body ?? {},
     };
 
     const clearCookie = vi.fn(() => res);
@@ -195,6 +207,7 @@ describe('POST /api/auth/logout CSRF policy', () => {
     vi.clearAllMocks();
     mocks.verifyRefreshToken.mockReturnValue(userPayload);
     mocks.csrfTokenMatches.mockReturnValue(true);
+    mocks.revokeRefreshSession.mockResolvedValue(true);
   });
 
   it('keeps web logout idempotent when the refresh cookie is absent', async () => {
@@ -205,6 +218,7 @@ describe('POST /api/auth/logout CSRF policy', () => {
     expect(response.statusCode).toBe(200);
     expectClearedCookie(response.clearCookie, 'insforge_refresh_token', '/api/auth');
     expect(mocks.verifyRefreshToken).not.toHaveBeenCalled();
+    expect(mocks.revokeRefreshSession).not.toHaveBeenCalled();
   });
 
   it('clears a stale web refresh cookie without requiring CSRF', async () => {
@@ -220,6 +234,7 @@ describe('POST /api/auth/logout CSRF policy', () => {
     expect(response.statusCode).toBe(200);
     expectClearedCookie(response.clearCookie, 'insforge_refresh_token', '/api/auth');
     expect(mocks.csrfTokenMatches).not.toHaveBeenCalled();
+    expect(mocks.revokeRefreshSession).not.toHaveBeenCalled();
   });
 
   it('rejects a valid web refresh cookie when CSRF is missing', async () => {
@@ -234,6 +249,7 @@ describe('POST /api/auth/logout CSRF policy', () => {
     expect(response.body).toMatchObject({ error: ERROR_CODES.FORBIDDEN });
     expect(response.clearCookie).not.toHaveBeenCalled();
     expect(mocks.csrfTokenMatches).toHaveBeenCalledWith(undefined, userPayload);
+    expect(mocks.revokeRefreshSession).not.toHaveBeenCalled();
   });
 
   it('rejects a valid web refresh cookie when CSRF header is multi-valued', async () => {
@@ -249,6 +265,7 @@ describe('POST /api/auth/logout CSRF policy', () => {
     expect(response.body).toMatchObject({ error: ERROR_CODES.FORBIDDEN });
     expect(response.clearCookie).not.toHaveBeenCalled();
     expect(mocks.csrfTokenMatches).toHaveBeenCalledWith(undefined, userPayload);
+    expect(mocks.revokeRefreshSession).not.toHaveBeenCalled();
   });
 
   it('clears non-user refresh sessions from the user logout cookie slot', async () => {
@@ -280,6 +297,57 @@ describe('POST /api/auth/logout CSRF policy', () => {
     expect(mocks.csrfTokenMatches).toHaveBeenCalledWith('csrf-token', userPayload);
   });
 
+  it('revokes the server-side session on web logout', async () => {
+    const response = await callLogout(router, {
+      query: { client_type: 'web' },
+      cookies: { insforge_refresh_token: 'valid-refresh-token' },
+      headers: { 'x-csrf-token': 'csrf-token' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(mocks.revokeRefreshSession).toHaveBeenCalledTimes(1);
+    expect(mocks.revokeRefreshSession).toHaveBeenCalledWith('valid-refresh-token', 'user');
+  });
+
+  it('does not revoke another session type from the user logout slot', async () => {
+    mocks.verifyRefreshToken.mockReturnValue({
+      ...userPayload,
+      sessionType: 'admin',
+    });
+
+    const response = await callLogout(router, {
+      query: { client_type: 'web' },
+      cookies: { insforge_refresh_token: 'admin-refresh-token' },
+      headers: { 'x-csrf-token': 'csrf-token' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(mocks.revokeRefreshSession).not.toHaveBeenCalled();
+  });
+
+  it('revokes the presented token on non-web logout', async () => {
+    const response = await callLogout(router, {
+      query: { client_type: 'mobile' },
+      body: { refreshToken: 'mobile-refresh-token' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.clearCookie).not.toHaveBeenCalled();
+    expect(mocks.verifyRefreshToken).not.toHaveBeenCalled();
+    expect(mocks.revokeRefreshSession).toHaveBeenCalledTimes(1);
+    expect(mocks.revokeRefreshSession).toHaveBeenCalledWith('mobile-refresh-token', 'user');
+  });
+
+  it('keeps non-web logout successful when no token is sent', async () => {
+    const response = await callLogout(router, {
+      query: { client_type: 'mobile' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.clearCookie).not.toHaveBeenCalled();
+    expect(mocks.revokeRefreshSession).not.toHaveBeenCalled();
+  });
+
   it('leaves non-web logout unchanged', async () => {
     const response = await callLogout(router, {
       query: { client_type: 'mobile' },
@@ -289,6 +357,7 @@ describe('POST /api/auth/logout CSRF policy', () => {
     expect(response.statusCode).toBe(200);
     expect(response.clearCookie).not.toHaveBeenCalled();
     expect(mocks.verifyRefreshToken).not.toHaveBeenCalled();
+    expect(mocks.revokeRefreshSession).not.toHaveBeenCalled();
   });
 });
 
@@ -303,6 +372,7 @@ describe('POST /api/auth/admin/logout CSRF policy', () => {
     vi.clearAllMocks();
     mocks.verifyRefreshToken.mockReturnValue(adminPayload);
     mocks.csrfTokenMatches.mockReturnValue(true);
+    mocks.revokeRefreshSession.mockResolvedValue(true);
   });
 
   it('keeps admin logout idempotent when the refresh cookie is absent', async () => {
@@ -311,6 +381,7 @@ describe('POST /api/auth/admin/logout CSRF policy', () => {
     expect(response.statusCode).toBe(200);
     expectClearedCookie(response.clearCookie, 'insforge_admin_refresh_token', '/api/auth/admin');
     expect(mocks.verifyRefreshToken).not.toHaveBeenCalled();
+    expect(mocks.revokeRefreshSession).not.toHaveBeenCalled();
   });
 
   it('clears a stale admin refresh cookie without requiring CSRF', async () => {
@@ -325,6 +396,7 @@ describe('POST /api/auth/admin/logout CSRF policy', () => {
     expect(response.statusCode).toBe(200);
     expectClearedCookie(response.clearCookie, 'insforge_admin_refresh_token', '/api/auth/admin');
     expect(mocks.csrfTokenMatches).not.toHaveBeenCalled();
+    expect(mocks.revokeRefreshSession).not.toHaveBeenCalled();
   });
 
   it('rejects a valid admin refresh cookie when CSRF is missing', async () => {
@@ -338,6 +410,7 @@ describe('POST /api/auth/admin/logout CSRF policy', () => {
     expect(response.body).toMatchObject({ error: ERROR_CODES.FORBIDDEN });
     expect(response.clearCookie).not.toHaveBeenCalled();
     expect(mocks.csrfTokenMatches).toHaveBeenCalledWith(undefined, adminPayload);
+    expect(mocks.revokeRefreshSession).not.toHaveBeenCalled();
   });
 
   it('rejects a valid admin refresh cookie when CSRF header is multi-valued', async () => {
@@ -352,6 +425,7 @@ describe('POST /api/auth/admin/logout CSRF policy', () => {
     expect(response.body).toMatchObject({ error: ERROR_CODES.FORBIDDEN });
     expect(response.clearCookie).not.toHaveBeenCalled();
     expect(mocks.csrfTokenMatches).toHaveBeenCalledWith(undefined, adminPayload);
+    expect(mocks.revokeRefreshSession).not.toHaveBeenCalled();
   });
 
   it('clears non-admin refresh sessions from the admin logout cookie slot', async () => {
@@ -365,6 +439,7 @@ describe('POST /api/auth/admin/logout CSRF policy', () => {
     expect(response.statusCode).toBe(200);
     expectClearedCookie(response.clearCookie, 'insforge_admin_refresh_token', '/api/auth/admin');
     expect(mocks.csrfTokenMatches).not.toHaveBeenCalled();
+    expect(mocks.revokeRefreshSession).not.toHaveBeenCalled();
   });
 
   it('clears a valid admin refresh cookie when CSRF is valid', async () => {
@@ -376,5 +451,19 @@ describe('POST /api/auth/admin/logout CSRF policy', () => {
     expect(response.statusCode).toBe(200);
     expectClearedCookie(response.clearCookie, 'insforge_admin_refresh_token', '/api/auth/admin');
     expect(mocks.csrfTokenMatches).toHaveBeenCalledWith('csrf-token', adminPayload);
+  });
+
+  it('revokes the server-side admin session on logout', async () => {
+    const response = await callLogout(router, {
+      cookies: { insforge_admin_refresh_token: 'valid-admin-refresh-token' },
+      headers: { 'x-csrf-token': 'csrf-token' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(mocks.revokeRefreshSession).toHaveBeenCalledTimes(1);
+    expect(mocks.revokeRefreshSession).toHaveBeenCalledWith(
+      'valid-admin-refresh-token',
+      'admin'
+    );
   });
 });

@@ -616,6 +616,8 @@ paths:
         Refresh access token using refresh token.
         - Web clients: Use httpOnly refresh token cookie with X-CSRF-Token header
         - Mobile/Desktop/Server clients: Send refreshToken in request body
+        Refresh tokens are single-use: each successful refresh consumes the presented
+        token and returns a replacement. Reusing a consumed token returns 401.
       tags:
         - Client
       parameters:
@@ -676,9 +678,12 @@ paths:
 
         Web clients use the httpOnly refresh token cookie. If a valid web refresh cookie is present,
         the request must include the `X-CSRF-Token` header returned from login, registration, or refresh.
+        The session behind the presented token is revoked server-side and the cookie is cleared.
         Missing, expired, invalid, or wrong-session-type refresh cookies are cleared idempotently and still
-        return success. Mobile, desktop, and server clients do not have server-side logout state and should
-        discard their stored refresh token after this request.
+        return success. Mobile, desktop, and server clients should send their stored refresh token
+        (`refreshToken` in the request body) so the server can revoke that session; requests without a
+        token still return success and the client should discard its stored refresh token after this request.
+        Logout is per-session: other devices/sessions belonging to the same user are unaffected.
       tags:
         - Client
       parameters:

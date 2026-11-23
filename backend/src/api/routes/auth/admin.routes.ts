@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { AuthService } from '@/services/auth/auth.service.js';
+import { RefreshSessionService } from '@/services/auth/refresh-session.service.js';
 import { AuthRequest, verifyToken } from '@/api/middlewares/auth.js';
 import { TokenManager, type RefreshTokenPayload } from '@/infra/security/token.manager.js';
 import { AppError } from '@/utils/errors.js';
@@ -38,8 +39,8 @@ router.post('/sessions/exchange', async (req: Request, res: Response, next: Next
       await authService.adminLoginWithAuthorizationCode(code);
 
     // Set refresh token as httpOnly cookie + CSRF token for web clients
-    const tokenManager = TokenManager.getInstance();
-    const { refreshToken, csrfToken } = tokenManager.generateRefreshTokenWithCsrf(
+    const refreshSessions = RefreshSessionService.getInstance();
+    const { refreshToken, csrfToken } = await refreshSessions.issueSessionForSubject(
       result.admin.sub,
       'admin'
     );
@@ -57,7 +58,7 @@ router.post('/sessions/exchange', async (req: Request, res: Response, next: Next
 });
 
 // POST /api/auth/admin/sessions - Create admin session (web only)
-router.post('/sessions', (req: Request, res: Response, next: NextFunction) => {
+router.post('/sessions', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const validationResult = createAdminSessionRequestSchema.safeParse(req.body);
     if (!validationResult.success) {
@@ -72,8 +73,8 @@ router.post('/sessions', (req: Request, res: Response, next: NextFunction) => {
     const result: CreateAdminSessionResponse = authService.adminLogin(username, password);
 
     // Set refresh token as httpOnly cookie + CSRF token for web clients
-    const tokenManager = TokenManager.getInstance();
-    const { refreshToken, csrfToken } = tokenManager.generateRefreshTokenWithCsrf(
+    const refreshSessions = RefreshSessionService.getInstance();
+    const { refreshToken, csrfToken } = await refreshSessions.issueSessionForSubject(
       result.admin.sub,
       'admin'
     );
@@ -110,7 +111,8 @@ router.get(
 
 // POST /api/auth/admin/refresh - Refresh admin dashboard access token
 // Uses a dashboard-specific httpOnly cookie + X-CSRF-Token header.
-router.post('/refresh', (req: Request, res: Response, next: NextFunction) => {
+// Single-use rotation: the presented token is consumed and cannot refresh again.
+router.post('/refresh', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const tokenManager = TokenManager.getInstance();
     const refreshToken = req.cookies?.[ADMIN_REFRESH_TOKEN_COOKIE_NAME];
@@ -126,20 +128,21 @@ router.post('/refresh', (req: Request, res: Response, next: NextFunction) => {
 
     tokenManager.verifyCsrfToken(req.headers['x-csrf-token'], payload, 'Auth:AdminRefresh');
 
+    const refreshSessions = RefreshSessionService.getInstance();
+    const rotated = await refreshSessions.rotateRefreshSession(refreshToken, 'admin');
+
     const newAccessToken = tokenManager.generateAccessToken({
-      sub: payload.sub,
+      sub: rotated.subjectId,
       role: 'project_admin',
     });
-    const { refreshToken: newRefreshToken, csrfToken: newCsrfToken } =
-      tokenManager.generateRefreshTokenWithCsrf(payload.sub, 'admin', payload.csrfNonce);
-    setAdminRefreshTokenCookie(res, newRefreshToken);
+    setAdminRefreshTokenCookie(res, rotated.refreshToken);
 
     successResponse(res, {
       admin: {
-        sub: payload.sub,
+        sub: rotated.subjectId,
       },
       accessToken: newAccessToken,
-      csrfToken: newCsrfToken,
+      csrfToken: rotated.csrfToken,
     });
   } catch (error) {
     if (error instanceof AppError && error.statusCode === 401) {
@@ -149,8 +152,8 @@ router.post('/refresh', (req: Request, res: Response, next: NextFunction) => {
   }
 });
 
-// POST /api/auth/admin/logout - Logout dashboard session
-router.post('/logout', (req: Request, res: Response, next: NextFunction) => {
+// POST /api/auth/admin/logout - Logout dashboard session (revokes the session)
+router.post('/logout', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const refreshToken = req.cookies?.[ADMIN_REFRESH_TOKEN_COOKIE_NAME];
 
@@ -164,6 +167,7 @@ router.post('/logout', (req: Request, res: Response, next: NextFunction) => {
       }
       if (payload?.sessionType === 'admin') {
         tokenManager.verifyCsrfToken(req.headers['x-csrf-token'], payload, 'Auth:AdminLogout');
+        await RefreshSessionService.getInstance().revokeRefreshSession(refreshToken, 'admin');
       }
     }
 

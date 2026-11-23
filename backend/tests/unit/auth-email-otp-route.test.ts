@@ -12,8 +12,7 @@ const mocks = vi.hoisted(() => ({
   signInWithOTP: vi.fn(),
   login: vi.fn(),
   verifyOTPRequest: vi.fn(),
-  generateRefreshToken: vi.fn(),
-  generateRefreshTokenWithCsrf: vi.fn(),
+  issueSessionForSubject: vi.fn(),
 }));
 
 vi.mock('@/services/auth/auth.service.js', () => ({
@@ -41,8 +40,16 @@ vi.mock('@/infra/security/token.manager.js', () => ({
     getInstance: () => ({
       verifyToken: vi.fn(),
       generateAccessToken: vi.fn(),
-      generateRefreshToken: mocks.generateRefreshToken,
-      generateRefreshTokenWithCsrf: mocks.generateRefreshTokenWithCsrf,
+    }),
+  },
+}));
+
+vi.mock('@/services/auth/refresh-session.service.js', () => ({
+  RefreshSessionService: {
+    getInstance: () => ({
+      issueSessionForSubject: mocks.issueSessionForSubject,
+      rotateRefreshSession: vi.fn(),
+      revokeRefreshSession: vi.fn(),
     }),
   },
 }));
@@ -126,8 +133,7 @@ describe('email OTP auth routes', () => {
     mocks.sendSignInOTP.mockResolvedValue(undefined);
     mocks.signInWithOTP.mockResolvedValue({ ...SESSION });
     mocks.login.mockResolvedValue({ ...SESSION });
-    mocks.generateRefreshToken.mockReturnValue('refresh-token');
-    mocks.generateRefreshTokenWithCsrf.mockReturnValue({
+    mocks.issueSessionForSubject.mockResolvedValue({
       refreshToken: 'refresh-token',
       csrfToken: 'csrf-token',
     });
@@ -158,7 +164,7 @@ describe('email OTP auth routes', () => {
     });
     expect(mocks.signInWithOTP).toHaveBeenCalledWith('user@example.com', '123456', 'Ada');
     expect(mocks.verifyOTPRequest).toHaveBeenCalledOnce();
-    expect(mocks.generateRefreshTokenWithCsrf).toHaveBeenCalledWith(SESSION.user.id, 'user');
+    expect(mocks.issueSessionForSubject).toHaveBeenCalledWith(SESSION.user.id, 'user');
   });
 
   it('returns a refresh token in the body for native OTP clients', async () => {
@@ -170,7 +176,7 @@ describe('email OTP auth routes', () => {
     );
 
     expect(response.body).toMatchObject({ refreshToken: 'refresh-token' });
-    expect(mocks.generateRefreshToken).toHaveBeenCalledWith(SESSION.user.id, 'user');
+    expect(mocks.issueSessionForSubject).toHaveBeenCalledWith(SESSION.user.id, 'user');
   });
 
   it('keeps password sessions backward compatible without method or OTP rate limiting', async () => {

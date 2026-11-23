@@ -250,6 +250,8 @@ describe('AuthService email OTP sign-in', () => {
         rows: [{ id: USER_RECORD.id, email_verified: false }],
       }) // SELECT auth.users (found, unverified)
       .mockResolvedValueOnce({ rows: [] }) // UPDATE password = NULL
+      .mockResolvedValueOnce({ rows: [{ session_version: 1 }] }) // UPDATE session_version bump
+      .mockResolvedValueOnce({ rows: [], rowCount: 1 }) // UPDATE auth.refresh_sessions revoked
       .mockResolvedValueOnce({ rows: [] }); // INSERT auth.user_providers
 
     await authService.signInWithOTP('user@example.com', '123456');
@@ -259,6 +261,18 @@ describe('AuthService email OTP sign-in', () => {
     );
     expect(updateCall).toBeDefined();
     expect(updateCall?.[1]).toEqual([USER_RECORD.id]);
+
+    // Destroying password auth invalidates older refresh sessions like a reset.
+    expect(
+      mocks.client.query.mock.calls.some(
+        ([sql]) => typeof sql === 'string' && sql.includes('SET session_version = session_version + 1')
+      )
+    ).toBe(true);
+    expect(
+      mocks.client.query.mock.calls.some(
+        ([sql]) => typeof sql === 'string' && sql.includes('SET revoked_at')
+      )
+    ).toBe(true);
   });
 
   it('preserves the password and single email provider for an existing verified user', async () => {
@@ -333,6 +347,8 @@ describe('AuthService email OTP sign-in', () => {
         rows: [{ id: USER_RECORD.id, email_verified: false }],
       }) // re-SELECT auth.users (found)
       .mockResolvedValueOnce({ rows: [] }) // UPDATE password = NULL
+      .mockResolvedValueOnce({ rows: [{ session_version: 1 }] }) // UPDATE session_version bump
+      .mockResolvedValueOnce({ rows: [], rowCount: 1 }) // UPDATE auth.refresh_sessions revoked
       .mockResolvedValueOnce({ rows: [] }); // INSERT auth.user_providers
 
     await authService.signInWithOTP('user@example.com', '123456');

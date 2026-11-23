@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { AuthService } from '@/services/auth/auth.service.js';
+import { RefreshSessionService } from '@/services/auth/refresh-session.service.js';
 import { AuthConfigService } from '@/services/auth/auth-config.service.js';
 import { AuthOTPService, OTPPurpose } from '@/services/auth/auth-otp.service.js';
 import { AuditService } from '@/services/logs/audit.service.js';
@@ -23,7 +24,7 @@ import {
   setRefreshTokenCookie,
   clearRefreshTokenCookie,
 } from '@/utils/cookies.js';
-import { parseClientType } from '@/utils/utils.js';
+import { parseClientType, type ClientType } from '@/utils/utils.js';
 import {
   ERROR_CODES,
   roleSchema,
@@ -89,6 +90,34 @@ function buildRedirectUrl(baseUrl: string, params: Record<string, string>): stri
     url.searchParams.set(key, value);
   });
   return url.toString();
+}
+
+/**
+ * Mint a tracked refresh session and attach it to a login response using the
+ * existing per-client-type contract (httpOnly cookie + CSRF token for web,
+ * body token otherwise). Persists the server-side record that single-use
+ * rotation, logout revocation, and password-reset invalidation rely on.
+ */
+async function attachRefreshSession(
+  res: Response,
+  result: { csrfToken?: string | null; refreshToken?: string | null },
+  userId: string,
+  clientType: ClientType
+): Promise<void> {
+  const refreshSessions = RefreshSessionService.getInstance();
+  const { refreshToken, csrfToken } = await refreshSessions.issueSessionForSubject(
+    userId,
+    'user'
+  );
+  if (clientType === 'web') {
+    // Web clients: use httpOnly cookie + CSRF token
+    setRefreshTokenCookie(res, refreshToken);
+    result.csrfToken = csrfToken;
+  } else {
+    // Non-web clients (mobile, desktop, server): return refresh token in response body.
+    // Server clients cannot rely on browser cookies, so they follow the native-app flow.
+    result.refreshToken = refreshToken;
+  }
 }
 
 // Mount OAuth routes
@@ -393,21 +422,7 @@ router.post('/users', verifyUser, async (req: AuthRequest, res: Response, next: 
 
     // Set refresh token based on client type (skip when admin is adding a user)
     if (result.accessToken && result.user && !adminCreatingUser) {
-      const tokenManager = TokenManager.getInstance();
-      if (clientType === 'web') {
-        // Web clients: use httpOnly cookie + CSRF token
-        const { refreshToken, csrfToken } = tokenManager.generateRefreshTokenWithCsrf(
-          result.user.id,
-          'user'
-        );
-        setRefreshTokenCookie(res, refreshToken);
-        result.csrfToken = csrfToken;
-      } else {
-        const refreshToken = tokenManager.generateRefreshToken(result.user.id, 'user');
-        // Non-web clients (mobile, desktop, server): return refresh token in response body.
-        // Server clients cannot rely on browser cookies, so they follow the native-app flow.
-        result.refreshToken = refreshToken;
-      }
+      await attachRefreshSession(res, result, result.user.id, clientType);
     }
 
     dashboardEventService.publishDataUpdate({ resource: 'users' });
@@ -442,20 +457,7 @@ router.post(
           : await authService.login(credentials.email, credentials.password);
 
       // Set refresh token based on client type
-      const tokenManager = TokenManager.getInstance();
-      if (clientType === 'web') {
-        const { refreshToken, csrfToken } = tokenManager.generateRefreshTokenWithCsrf(
-          result.user.id,
-          'user'
-        );
-        setRefreshTokenCookie(res, refreshToken);
-        result.csrfToken = csrfToken;
-      } else {
-        const refreshToken = tokenManager.generateRefreshToken(result.user.id, 'user');
-        // Non-web clients (mobile, desktop, server): return refresh token in response body.
-        // Server clients cannot rely on browser cookies, so they follow the native-app flow.
-        result.refreshToken = refreshToken;
-      }
+      await attachRefreshSession(res, result, result.user.id, clientType);
 
       successResponse(res, result);
     } catch (error) {
@@ -496,21 +498,7 @@ router.post(
           : await authService.signInWithIdToken('google', request.token);
 
       // Set refresh token based on client type
-      const tokenManager = TokenManager.getInstance();
-      if (clientType === 'web') {
-        // Web clients: use httpOnly cookie + CSRF token
-        const { refreshToken, csrfToken } = tokenManager.generateRefreshTokenWithCsrf(
-          result.user.id,
-          'user'
-        );
-        setRefreshTokenCookie(res, refreshToken);
-        result.csrfToken = csrfToken;
-      } else {
-        const refreshToken = tokenManager.generateRefreshToken(result.user.id, 'user');
-        // Non-web clients (mobile, desktop, server): return refresh token in response body.
-        // Server clients cannot rely on browser cookies, so they follow the native-app flow.
-        result.refreshToken = refreshToken;
-      }
+      await attachRefreshSession(res, result, result.user.id, clientType);
 
       successResponse(res, result);
     } catch (error) {
@@ -566,11 +554,19 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
       tokenManager.verifyCsrfToken(req.headers['x-csrf-token'], payload, 'Auth:Refresh');
     }
 
+    // Atomically consume the presented token and mint its successor. Reuse of
+    // a consumed/revoked token, an unknown (legacy) token, or a token whose
+    // session version is stale (password reset) fails here with 401.
+    const refreshSessions = RefreshSessionService.getInstance();
+    const rotated = await refreshSessions.rotateRefreshSession(refreshToken, 'user');
+
     // Fetch current user data from DB.
-    const dbUser = await authService.getUserById(payload.sub);
+    const dbUser = await authService.getUserById(rotated.subjectId);
 
     if (!dbUser) {
-      logger.warn('[Auth:Refresh] User not found for valid refresh token', { userId: payload.sub });
+      logger.warn('[Auth:Refresh] User not found for valid refresh token', {
+        userId: rotated.subjectId,
+      });
       if (clientType === 'web') {
         clearRefreshTokenCookie(res);
       }
@@ -587,26 +583,22 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
     });
 
     if (clientType === 'web') {
-      const { refreshToken: newRefreshToken, csrfToken: newCsrfToken } =
-        tokenManager.generateRefreshTokenWithCsrf(user.id, 'user', payload.csrfNonce);
-
-      // Web clients: set cookie + return CSRF token
-      setRefreshTokenCookie(res, newRefreshToken);
+      // Web clients: set cookie + return CSRF token (CSRF lineage is stable
+      // across rotation so multi-tab clients keep working).
+      setRefreshTokenCookie(res, rotated.refreshToken);
 
       successResponse(res, {
         accessToken: newAccessToken,
         user,
-        csrfToken: newCsrfToken,
+        csrfToken: rotated.csrfToken,
       });
     } else {
-      const newRefreshToken = tokenManager.generateRefreshToken(user.id, 'user', payload.csrfNonce);
-
       // Non-web clients (mobile, desktop, server): return refresh token in body.
       // Server callers are expected to persist the rotated token between requests.
       successResponse(res, {
         accessToken: newAccessToken,
         user,
-        refreshToken: newRefreshToken,
+        refreshToken: rotated.refreshToken,
       });
     }
   } catch (error) {
@@ -618,13 +610,17 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
   }
 });
 
-// POST /api/auth/logout - Logout and clear refresh token cookie
+// POST /api/auth/logout - Logout and revoke the refresh session
 // Query params: client_type (optional) - 'web' (default), 'mobile', 'desktop', or 'server'
-// Web clients: clears the httpOnly refresh token cookie
-// Non-web clients (mobile, desktop, server): no server-side action needed (client should discard token)
-router.post('/logout', (req: Request, res: Response, next: NextFunction) => {
+// Web clients: revokes the session behind the httpOnly refresh token cookie, then clears it
+// Non-web clients (mobile, desktop, server): revokes the session behind the
+// refreshToken sent in the request body when provided; requests without a
+// token keep the historical success response (client discards locally).
+// Logout is per-session: other devices/sessions are unaffected.
+router.post('/logout', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const clientType = parseClientType(req.query.client_type);
+    const refreshSessions = RefreshSessionService.getInstance();
 
     if (clientType === 'web') {
       const refreshToken = req.cookies?.[REFRESH_TOKEN_COOKIE_NAME];
@@ -639,13 +635,22 @@ router.post('/logout', (req: Request, res: Response, next: NextFunction) => {
         }
         if (payload?.sessionType === 'user') {
           tokenManager.verifyCsrfToken(req.headers['x-csrf-token'], payload, 'Auth:Logout');
+          await refreshSessions.revokeRefreshSession(refreshToken, 'user');
         }
       }
 
       clearRefreshTokenCookie(res);
+    } else {
+      // For non-web clients: revoke the presented token's session on the server.
+      // Only the exact presented token's session is revoked - never another
+      // user's session, since lookup is by token hash, not by submitted IDs.
+      const presentedToken = req.body?.refreshToken ?? req.body?.refresh_token;
+      if (typeof presentedToken === 'string' && presentedToken.length > 0) {
+        await refreshSessions.revokeRefreshSession(presentedToken, 'user');
+      }
+      // No token sent: nothing server-side to revoke; the caller discards its
+      // locally stored token. Still returns success for compatibility.
     }
-    // For non-web clients: no server-side cleanup needed.
-    // The caller is responsible for discarding the refresh token it stored.
 
     successResponse(res, {
       success: true,
@@ -934,21 +939,7 @@ router.post(
       const result: VerifyEmailResponse = await authService.verifyEmailWithCode(email, otp);
 
       // Set refresh token based on client type
-      const tokenManager = TokenManager.getInstance();
-      if (clientType === 'web') {
-        // Web clients: use httpOnly cookie + CSRF token
-        const { refreshToken, csrfToken } = tokenManager.generateRefreshTokenWithCsrf(
-          result.user.id,
-          'user'
-        );
-        setRefreshTokenCookie(res, refreshToken);
-        result.csrfToken = csrfToken;
-      } else {
-        const refreshToken = tokenManager.generateRefreshToken(result.user.id, 'user');
-        // Non-web clients (mobile, desktop, server): return refresh token in response body.
-        // Server clients cannot rely on browser cookies, so they follow the native-app flow.
-        result.refreshToken = refreshToken;
-      }
+      await attachRefreshSession(res, result, result.user.id, clientType);
 
       successResponse(res, result);
     } catch (error) {
