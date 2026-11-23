@@ -1,0 +1,2 @@
+# Live sweep dumps (results-<scope>-limit<K>.json). Keep the aggregates baseline.
+/results-*.json
