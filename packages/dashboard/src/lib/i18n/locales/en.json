@@ -1014,7 +1014,7 @@
     "disableSignupsLabel": "Disable New User Signups",
     "disableSignupsDescription": "When on, public sign-up is rejected and only existing users can sign in. Project admins can still create users via the dashboard or API.",
     "allowedRedirectUrlsLabel": "Allowed Redirect URLs",
-    "allowedRedirectUrlsDescription": "Allowed redirect destinations for auth flows. Leave empty to allow all URLs.",
+    "allowedRedirectUrlsDescription": "Add the full app callback URL, including its path, or a pattern like https://app.example.com/**. Update this list when your app moves to a custom domain. Leave empty to allow all URLs.",
     "invalidUrl": "Invalid URL",
     "addUrl": "Add URL",
     "emailVerificationProviderRequired": "Email verification settings require InsForge Cloud or enabled custom SMTP.",

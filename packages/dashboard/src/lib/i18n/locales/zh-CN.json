@@ -994,7 +994,7 @@
     "disableSignupsLabel": "禁止新用户注册",
     "disableSignupsDescription": "开启后将拒绝公开注册，只有现有用户可以登录。项目管理员仍可通过控制台或 API 创建用户。",
     "allowedRedirectUrlsLabel": "允许的重定向 URL",
-    "allowedRedirectUrlsDescription": "认证流程允许的重定向目标。留空则允许所有 URL。",
+    "allowedRedirectUrlsDescription": "添加应用的完整回调 URL（包括路径），或使用 https://app.example.com/** 这样的模式。应用迁移到自定义域名后，请更新此列表。留空则允许所有 URL。",
     "invalidUrl": "无效的 URL",
     "addUrl": "添加 URL",
     "emailVerificationProviderRequired": "邮箱验证设置需要 InsForge Cloud 或已启用的自定义 SMTP。",
