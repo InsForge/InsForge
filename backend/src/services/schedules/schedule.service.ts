@@ -172,7 +172,10 @@ export class ScheduleService {
 
           if (secretValue) {
             const placeholder = `\${{secrets.${secretKey}}}`;
-            value = value.replaceAll(placeholder, secretValue);
+            // Pass the secret through a replacer function so `$&`, `$'`,
+            // backtick-`$ and `$$` inside the secret value are inserted
+            // literally instead of being read as replacement patterns.
+            value = value.replaceAll(placeholder, () => secretValue);
           } else {
             throw new AppError(
               `Secret with key "${secretKey}" not found for schedule header "${key}".`,
