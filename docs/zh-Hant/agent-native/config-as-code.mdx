@@ -92,6 +92,8 @@ description: "以單一 insforge.toml 宣告 InsForge 驗證、SMTP、儲存、�
 
 因為 TOML 沒有 `null` 文本，使用 `retention_days = 0` 停用即時訊息或排程執行日誌的保留清理；`config apply` 為該值向後端傳送 `null`。`[schedules] retention_days` 也決定 pg_cron 自身執行日誌（`cron.job_run_details`）的保留時間，正值會按原樣生效。停用保留時，該日誌改用 30 天作為備用值：設定 `retention_days = 0` 時，排程執行日誌會永久保留，但超過 30 天的已完成 pg_cron 執行紀錄仍會被刪除。電子郵件範本、OAuth 提供者應用認證、儲存體、即時通道、函數、部署環境變數和秘密不透過此檔案管理。
 
+`storage.max_file_size_mb` 是單一檔案上傳的上限。它接受 1 到 200 之間的整數，預設值為 50；超出該範圍的值會被 API 拒絕。
+
 完整範例：
 
 ```toml

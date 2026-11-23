@@ -92,6 +92,8 @@ The file mirrors a curated subset of project config, the parts that are useful t
 
 Because TOML has no `null` literal, use `retention_days = 0` to disable retention cleanup for realtime messages or schedule execution logs; `config apply` sends `null` to the backend for that value. `[schedules] retention_days` also controls how long pg_cron's own run log (`cron.job_run_details`) is kept: a positive value applies to it as-is. When retention is disabled, that log falls back to 30 days instead: with `retention_days = 0`, schedule execution logs are kept forever, but finished pg_cron runs older than 30 days are still deleted. Email templates, OAuth provider app credentials, buckets, realtime channels, functions, deployment environment variables, and secrets are not managed through this file.
 
+`storage.max_file_size_mb` is the per-file upload ceiling. It accepts an integer between 1 and 200 and defaults to 50; the API rejects values outside that range.
+
 A complete example:
 
 ```toml
