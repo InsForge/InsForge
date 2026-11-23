@@ -29,6 +29,7 @@ vi.mock('@/api/middlewares/rate-limiters.js', () => ({
   sendEmailOTPLimiter: [(_req: Request, _res: Response, next: NextFunction) => next()],
   verifyOTPLimiter: [(_req: Request, _res: Response, next: NextFunction) => next()],
   verifyOTPRateLimiter: (_req: Request, _res: Response, next: NextFunction) => next(),
+  adminLoginRateLimiter: (_req: Request, _res: Response, next: NextFunction) => next(),
 }));
 
 vi.mock('@/services/auth/auth.service.js', () => ({

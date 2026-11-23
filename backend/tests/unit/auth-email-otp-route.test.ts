@@ -30,6 +30,7 @@ vi.mock('@/api/middlewares/rate-limiters.js', () => ({
   idTokenSignInRateLimiter: (_req: Request, _res: Response, next: NextFunction) => next(),
   sendEmailOTPLimiter: [(_req: Request, _res: Response, next: NextFunction) => next()],
   verifyOTPLimiter: [(_req: Request, _res: Response, next: NextFunction) => next()],
+  adminLoginRateLimiter: (_req: Request, _res: Response, next: NextFunction) => next(),
   verifyOTPRateLimiter: (req: Request, _res: Response, next: NextFunction) => {
     mocks.verifyOTPRequest(req.body);
     next();
