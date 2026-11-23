@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FilePreviewDialog } from '#features/storage/components/FilePreviewDialog';
 import type { StorageFileSchema } from '@insforge/shared-schemas';
 
@@ -22,10 +22,13 @@ const fileB: StorageFileSchema = {
   url: 'https://example.test/api/storage/buckets/test-bucket/objects/docs%2Fb.pdf',
 };
 
+// One stable function: the dialog's preview effect depends on downloadObject, so
+// a fresh vi.fn() per render re-runs the effect forever and never leaves loading.
+const { downloadObject } = vi.hoisted(() => ({ downloadObject: vi.fn() }));
+downloadObject.mockResolvedValue(new Blob(['mock']));
+
 vi.mock('#features/storage/hooks/useStorageObjects', () => ({
-  useStorageObjects: () => ({
-    downloadObject: vi.fn().mockResolvedValue(new Blob(['mock'])),
-  }),
+  useStorageObjects: () => ({ downloadObject }),
 }));
 
 describe('FilePreviewDialog', () => {
@@ -248,5 +251,37 @@ describe('FilePreviewDialog', () => {
 
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }));
     expect(onNext).not.toHaveBeenCalled();
+  });
+
+  // Text masking doesn't hide media. ph-no-capture on the preview container is
+  // what keeps customer file contents out of PostHog session replays.
+  describe('session replay privacy', () => {
+    const originalCreateObjectURL = URL.createObjectURL;
+    const originalRevokeObjectURL = URL.revokeObjectURL;
+
+    beforeEach(() => {
+      URL.createObjectURL = vi.fn(() => 'blob:mock-preview');
+      URL.revokeObjectURL = vi.fn();
+    });
+
+    afterEach(() => {
+      URL.createObjectURL = originalCreateObjectURL;
+      URL.revokeObjectURL = originalRevokeObjectURL;
+    });
+
+    it('renders image previews inside a ph-no-capture container', async () => {
+      render(<FilePreviewDialog open onOpenChange={vi.fn()} file={fileA} bucket="test-bucket" />);
+
+      const image = await screen.findByRole('img', { name: 'a.png' });
+      expect(image.closest('.ph-no-capture')).not.toBeNull();
+    });
+
+    it('renders PDF previews inside a ph-no-capture container', async () => {
+      render(<FilePreviewDialog open onOpenChange={vi.fn()} file={fileB} bucket="test-bucket" />);
+
+      const frame = await screen.findByTitle('b.pdf');
+      expect(frame.tagName).toBe('IFRAME');
+      expect(frame.closest('.ph-no-capture')).not.toBeNull();
+    });
   });
 });
