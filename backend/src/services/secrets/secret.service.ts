@@ -30,6 +30,8 @@ interface AnonKeyCache {
 // database per request. Single-instance server, so no cross-instance
 // invalidation is needed; rotation invalidates the cache directly.
 const ANON_KEY_CACHE_TTL_MS = 60 * 1000;
+// Back-off between refresh attempts while serving an expired anon key cache.
+const ANON_KEY_REFRESH_RETRY_MS = 5 * 1000;
 
 // Old anon keys are embedded in deployed frontends and mobile binaries that
 // may sit in app-store review, so the default grace period is much longer
@@ -41,6 +43,7 @@ export class SecretService {
   private pool: Pool | null = null;
   private anonKeyCache: AnonKeyCache | null = null;
   private anonKeyLoadPromise: Promise<AnonKeyCache> | null = null;
+  private anonKeyRefreshRetryAt = 0;
 
   private constructor() {
     // Encryption is now handled by the shared EncryptionManager
@@ -359,12 +362,31 @@ export class SecretService {
   }
 
   /**
-   * Check if a secret value matches the stored value
+   * A credential could not be checked because the database lookup itself
+   * failed (pool exhausted, Postgres refusing connections, ...). That is an
+   * infrastructure fault, not a bad credential: answering 401 sends callers
+   * off to regenerate keys that were valid all along. Surface it as 503.
+   */
+  private credentialCheckUnavailable(logMessage: string, error: unknown): AppError {
+    logger.error(logMessage, {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return new AppError(
+      'Unable to verify credentials right now, please retry',
+      503,
+      ERROR_CODES.AUTH_UNAVAILABLE
+    );
+  }
+
+  /**
+   * Check if a secret value matches the stored value.
+   * Returns false for not-found / mismatch; throws 503 when the lookup fails.
    */
   async checkSecretByKey(key: string, value: string): Promise<boolean> {
+    let result: { rows: { value_ciphertext: string }[] };
     try {
       // Optimized: Single query that retrieves and updates in one operation
-      const result = await this.getPool().query(
+      result = await this.getPool().query(
         `UPDATE system.secrets
          SET last_used_at = NOW()
          WHERE key = $1
@@ -373,7 +395,11 @@ export class SecretService {
          RETURNING value_ciphertext`,
         [key]
       );
+    } catch (error) {
+      throw this.credentialCheckUnavailable('Failed to check secret', error);
+    }
 
+    try {
       if (!result.rows.length) {
         logger.warn('Secret not found for verification', { key });
         return false;
@@ -395,7 +421,10 @@ export class SecretService {
 
       return matches;
     } catch (error) {
-      logger.error('Failed to check secret', { error, key });
+      logger.error('Failed to compare secret value', {
+        error: error instanceof Error ? error.message : String(error),
+        key,
+      });
       return false;
     }
   }
@@ -541,8 +570,7 @@ export class SecretService {
       );
       rows = result.rows;
     } catch (error) {
-      logger.error('Failed to query grace-period API keys', { error });
-      return false;
+      throw this.credentialCheckUnavailable('Failed to query grace-period API keys', error);
     }
 
     const valueBuffer = Buffer.from(apiKey);
@@ -688,6 +716,7 @@ export class SecretService {
    */
   invalidateAnonKeyCache(): void {
     this.anonKeyCache = null;
+    this.anonKeyRefreshRetryAt = 0;
   }
 
   /**
@@ -702,12 +731,28 @@ export class SecretService {
     }
 
     let cache = this.anonKeyCache;
-    if (!cache || Date.now() - cache.loadedAt > ANON_KEY_CACHE_TTL_MS) {
+    const isFresh = cache !== null && Date.now() - cache.loadedAt <= ANON_KEY_CACHE_TTL_MS;
+    // While a failed refresh is backing off, keep serving the expired cache
+    // instead of sending every anonymous request to a database that is down.
+    const coolingDown = cache !== null && Date.now() < this.anonKeyRefreshRetryAt;
+    if (!cache || (!isFresh && !coolingDown)) {
       try {
         cache = await this.loadAnonKeys();
+        this.anonKeyRefreshRetryAt = 0;
       } catch (error) {
-        logger.error('Failed to load anon keys for verification', { error });
-        return false;
+        // Re-read rather than reuse the copy captured above: a rotation during
+        // the failed refresh invalidates the cache, and pre-rotation keys must
+        // not be served in its place.
+        cache = this.anonKeyCache;
+        if (!cache) {
+          throw this.credentialCheckUnavailable('Failed to load anon keys for verification', error);
+        }
+        // Prefer the expired cache over failing the request: anon keys only
+        // change on rotation, which invalidates the cache in this process.
+        this.anonKeyRefreshRetryAt = Date.now() + ANON_KEY_REFRESH_RETRY_MS;
+        logger.warn('Failed to refresh anon keys; serving cached keys', {
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
     }
 
