@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { RefreshCw, Trash2, ExternalLink } from 'lucide-react';
 import { LogsDataGrid, type LogsColumnDef } from '#features/logs/components';
-import { formatTime } from '#lib/utils/utils';
+import { formatTime, formatUtcTime } from '#lib/utils/utils';
 import { useConfirm } from '#lib/hooks/useConfirm';
 import { usePageSize } from '#lib/hooks/usePageSize';
 import { Button, ConfirmDialog, cn } from '@insforge/ui';
@@ -106,7 +106,10 @@ export default function AuditsPage() {
 
           return (
             <div className="flex w-full items-center gap-2">
-              <p className="min-w-0 flex-1 truncate text-[13px] font-normal leading-[18px] text-[rgb(var(--foreground))]">
+              <p
+                className="min-w-0 flex-1 truncate text-[13px] font-normal leading-[18px] text-[rgb(var(--foreground))]"
+                title={formatUtcTime(String(row.createdAt ?? ''))}
+              >
                 {`${timestamp} - ${details}`}
               </p>
               <ExternalLink className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
